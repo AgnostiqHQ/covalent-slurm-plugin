@@ -2,6 +2,7 @@
 #
 # This file is part of Covalent Cloud.
 
+import sys
 import site
 from setuptools import find_packages, setup
 
@@ -26,7 +27,7 @@ setup_info = {
     "author": "Agnostiq",
     "author_email": "support@agnostiq.ai",
     "description": "Covalent Slurm Plugin",
-    "long_description": open("README.md").read()
+    "long_description": open("README.md").read(),
     "long_description_content_type": "text/markdown",
     "include_package_data": True,
     "install_requires": required,
@@ -50,7 +51,7 @@ setup_info = {
         "Topic :: Software Development",
         "Topic :: System :: Distributed Computing",
     ],
-    entry_points: {
+    "entry_points": {
         "covalent.executor.executor_plugins": plugins_list,
     },
 }
