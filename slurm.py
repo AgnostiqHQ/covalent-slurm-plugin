@@ -57,7 +57,6 @@ class SlurmExecutor(BaseExecutor):
             print(f"Execution args: {execution_args}")
 
             results_dir = execution_args["results_dir"]
-            #time_limit = execution_args["time_limit"]
 
             # Write the serialized function to file
             pickle.dump(function, f)
