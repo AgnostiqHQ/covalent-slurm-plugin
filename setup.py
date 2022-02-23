@@ -2,6 +2,7 @@
 #
 # This file is part of Covalent Cloud.
 
+import sys
 import site
 from setuptools import find_packages, setup
 
@@ -13,21 +14,20 @@ with open("VERSION") as f:
 with open("requirements.txt") as f:
     required = f.read().splitlines()
 
-plugins_list = ["custom = custom"]
+plugins_list = ["slurm = slurm"]
 
 setup_info = {
-    # Add this to covalent's extra_requires to install as `pip install cova[custom]`
-    "name": "covalent-custom-plugin", 
+    "name": "covalent-slurm-plugin", 
     "packages": find_packages("."),
     "version": version,
     "maintainer": "Agnostiq",
-    "url": "https://github.com/AgnostiqHQ/covalent-custom-plugin",
-    "download_url": f"https://github.com/AgnostiqHQ/covalent-custom-plugin/archive/v{version}.tar.gz",
+    "url": "https://github.com/AgnostiqHQ/covalent-slurm-plugin",
+    "download_url": f"https://github.com/AgnostiqHQ/covalent-slurm-plugin/archive/v{version}.tar.gz",
     "license": "Proprietary",
     "author": "Agnostiq",
     "author_email": "support@agnostiq.ai",
-    "description": "Covalent Custom Executor Plugin",
-    "long_description": open("README.md").read()
+    "description": "Covalent Slurm Plugin",
+    "long_description": open("README.md").read(),
     "long_description_content_type": "text/markdown",
     "include_package_data": True,
     "install_requires": required,
@@ -51,7 +51,7 @@ setup_info = {
         "Topic :: Software Development",
         "Topic :: System :: Distributed Computing",
     ],
-    entry_points: {
+    "entry_points": {
         "covalent.executor.executor_plugins": plugins_list,
     },
 }

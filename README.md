@@ -9,6 +9,6 @@
 
 </div>
 
-## Covalent Custom Executor Plugin
+## Covalent Slurm Plugin
 
 This is a short description of this plugin.
