@@ -43,6 +43,33 @@ The first stanza describes default connection parameters for a user who is able 
 #SBATCH --parsable
 ```
 
+Within a workflow, users can then decorate electrons using these default settings:
+
+```python
+import covalent as ct
+
+@ct.electron(executor="slurm")
+def my_task(x, y):
+    return x + y
+```
+
+or use a class object to customize behavior scoped to specific tasks:
+
+```python
+executor = ct.executor.SlurmExecutor(
+    remote_workdir="/scratch/user/experiment1",
+    conda_env="covalent",
+    options={
+        "partition": "compute",
+	"cpus-per-task": 8
+    }
+)
+
+@ct.electron(executor=executor)
+def my_custom_task(x, y):
+    return x + y
+```
+
 For more information about how to get started with Covalent, check out the project [homepage](https://github.com/AgnostiqHQ/covalent) and the official [documentation](https://covalent.readthedocs.io/en/latest/).
 
 ## Release Notes

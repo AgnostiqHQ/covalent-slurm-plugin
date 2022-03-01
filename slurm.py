@@ -292,7 +292,7 @@ wait
 
         return slurm_submit_script
 
-    def _get_job_status(self, job_id: int) -> str:
+    def get_status(self, job_id: str) -> str:
         """Query the status of a job previously submitted to Slurm.
 
         Args:
@@ -317,7 +317,7 @@ wait
                 "/bin/bash",
                 "-l",
                 "-c",
-                f'"scontrol show job {str(job_id)}"',
+                f'"scontrol show job {job_id}"',
             ],
             check=True,
             capture_output=True,
@@ -335,7 +335,7 @@ wait
         """
 
         # Poll status every `poll_freq` seconds
-        status = self._get_job_status(job_id)
+        status = self.get_status(str(job_id))
         while (
             "PENDING" in status
             or "RUNNING" in status
@@ -343,7 +343,7 @@ wait
             or "CONFIGURING" in status
         ):
             time.sleep(self.poll_freq)
-            status = self._get_job_status(job_id)
+            status = self.get_status(str(job_id))
 
         if "COMPLETED" not in status:
             raise Exception("Job failed with status:\n", status)
@@ -437,3 +437,13 @@ wait
         os.remove(stderr_file)
 
         return result, stdout, stderr
+
+    def cancel(self, job_id: int) -> None:
+        """Cancel a Slurm job.
+
+        Args:
+            job_id: Slurm job ID.
+
+        Returns:
+            None
+        """
