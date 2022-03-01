@@ -23,15 +23,12 @@
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 from copy import deepcopy
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import cloudpickle as pickle
-from covalent._shared_files.logger import app_log
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent._workflow.transport import TransportableObject
 from covalent.executor import BaseExecutor
@@ -52,6 +49,18 @@ executor_plugin_name = "SlurmExecutor"
 
 
 class SlurmExecutor(BaseExecutor):
+    """Slurm executor plugin class.
+
+    Args:
+        username: Username used to authenticate over SSH.
+        address: Remote address or hostname of the Slurm login node.
+        ssh_key_file: Private RSA key used to authenticate over SSH.
+        remote_workdir: Working directory on the remote cluster.
+        poll_freq: Frequency with which to poll a submitted job.
+        cache_dir: Cache directory used by this executor for temporary files.
+        options: Dictionary of parameters used to build a Slurm submit script.
+    """
+
     def __init__(
         self,
         username: str,
@@ -131,7 +140,8 @@ class SlurmExecutor(BaseExecutor):
                 [
                     "rsync",
                     "-e",
-                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                    "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                     f.name,
                     f"{self.username}@{self.address}:{remote_func_filename}",
                 ],
@@ -144,8 +154,6 @@ class SlurmExecutor(BaseExecutor):
                 func_filename,
                 result_filename,
                 function.python_version,
-                dispatch_id,
-                node_id,
                 args,
                 kwargs,
             )
@@ -162,7 +170,8 @@ class SlurmExecutor(BaseExecutor):
                 [
                     "rsync",
                     "-e",
-                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                    "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                     g.name,
                     f"{self.username}@{self.address}:{remote_slurm_filename}",
                 ],
@@ -191,7 +200,6 @@ class SlurmExecutor(BaseExecutor):
                 ],
                 capture_output=True,
             )
-            app_log.warning(f"RETCODE: {proc.returncode}")
             if proc.returncode == 0:
                 slurm_job_id = int(proc.stdout.decode("utf-8").strip().split(";")[0])
             else:
@@ -206,8 +214,6 @@ class SlurmExecutor(BaseExecutor):
         func_filename: str,
         result_filename: str,
         python_version: str,
-        dispatch_id: str,
-        node_id: int,
         args: List,
         kwargs: Dict,
     ) -> str:
@@ -217,8 +223,6 @@ class SlurmExecutor(BaseExecutor):
             func_filename: Name of the pickled function.
             result_filename: Name of the pickled result.
             python_version: Python version required by the pickled function.
-            dispatch_id: Workflow UUID.
-            node_id: ID of the task within the workflow.
             args: Positional arguments consumed by the task.
             kwargs: Keyword arguments consumed by the task.
 
@@ -241,7 +245,8 @@ source $HOME/.bashrc
 conda activate {conda_env}
 retval=$?
 if [ $retval -ne 0 ] ; then
-  >&2 echo "Conda environment {conda_env} is not present on the compute node. Please create the environment and try again."
+  >&2 echo "Conda environment {conda_env} is not present on the compute node. "\
+  "Please create the environment and try again."
   exit 99
 fi
 
@@ -254,7 +259,8 @@ fi
 
         slurm_python_version = """
 if [[ "{python_version}" != `python -V | awk '{{print $2}}'` ]] ; then
-  >&2 echo "Python version mismatch. Please install Python {python_version} in the compute environment."
+  >&2 echo "Python version mismatch. Please install Python {python_version} in the compute "\
+  "environment."
   exit 199
 fi
 """.format(
@@ -380,7 +386,8 @@ wait
             [
                 "rsync",
                 "-e",
-                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                 f"{self.username}@{self.address}:{remote_result_filename}",
                 task_results_dir,
             ],
@@ -393,7 +400,8 @@ wait
             [
                 "rsync",
                 "-e",
-                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                 f"{self.username}@{self.address}:{self.options['output']}",
                 task_results_dir,
             ],
@@ -404,7 +412,8 @@ wait
             [
                 "rsync",
                 "-e",
-                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                 f"{self.username}@{self.address}:{self.options['error']}",
                 task_results_dir,
             ],
@@ -418,12 +427,12 @@ wait
         os.remove(local_result_filename)
 
         stdout_file = os.path.join(task_results_dir, os.path.basename(self.options["output"]))
-        with open(stdout_file) as f:
+        with open(stdout_file, "r") as f:
             stdout = f.read()
         os.remove(stdout_file)
 
         stderr_file = os.path.join(task_results_dir, os.path.basename(self.options["error"]))
-        with open(stderr_file) as f:
+        with open(stderr_file, "r") as f:
             stderr = f.read()
         os.remove(stderr_file)
 

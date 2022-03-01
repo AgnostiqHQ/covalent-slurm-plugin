@@ -11,7 +11,37 @@
 
 ## Covalent Slurm Plugin
 
-Covalent is a Pythonic workflow tool used to execute tasks on advanced computing hardware. This executor plugin interfaces Covalent with HPC systems managed by Slurm.
+Covalent is a Pythonic workflow tool used to execute tasks on advanced computing hardware. This executor plugin interfaces Covalent with HPC systems managed by [Slurm](https://slurm.schedmd.com/documentation.html). In order for workflows to be deployable, users must have SSH access to the Slurm login node, writable storage space on the remote filesystem, and permissions to submit jobs to Slurm.
+
+The following shows an example of how a user might modify their Covalent [configuration](https://covalent.readthedocs.io/en/latest/how_to/config/customization.html) to support Slurm:
+
+```console
+[executors.slurm]
+username = "user"
+address = "login.cluster.org"
+ssh_key_file = "/home/user/.ssh/id_rsa"
+remote_workdir = "/scratch/user"
+cache_dir = "/tmp/covalent"
+conda_env = ""
+
+[executors.slurm.options]
+partition = "general"
+cpus-per-task = 4
+gres = "gpu:v100:4"
+exclusive = ""
+parsable = ""
+```
+
+The first stanza describes default connection parameters for a user who is able to successfully connect to the Slurm login node using `ssh -i /home/user/.ssh/id_rsa user@login.cluster.org`. The second stanza describes default parameters which are used to construct a Slurm submit script. In this example, the submit script would contain the following preamble:
+
+```console
+#!/bin/bash
+#SBATCH --partition=general
+#SBATCH --cpus-per-task=4
+#SBATCH --gres=gpu:v100:4
+#SBATCH --exclusive
+#SBATCH --parsable
+```
 
 For more information about how to get started with Covalent, check out the project [homepage](https://github.com/AgnostiqHQ/covalent) and the official [documentation](https://covalent.readthedocs.io/en/latest/).
 
