@@ -13,6 +13,12 @@
 
 Covalent is a Pythonic workflow tool used to execute tasks on advanced computing hardware. This executor plugin interfaces Covalent with HPC systems managed by [Slurm](https://slurm.schedmd.com/documentation.html). In order for workflows to be deployable, users must have SSH access to the Slurm login node, writable storage space on the remote filesystem, and permissions to submit jobs to Slurm.
 
+To use this plugin with Covalent, simply install it using `pip`:
+
+```
+pip install covalent-slurm-plugin
+```
+
 The following shows an example of how a user might modify their Covalent [configuration](https://covalent.readthedocs.io/en/latest/how_to/config/customization.html) to support Slurm:
 
 ```console
