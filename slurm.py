@@ -1,6 +1,22 @@
 # Copyright 2021 Agnostiq Inc.
 #
-# This file is a part of Covalent Cloud.
+# This file is part of Covalent.
+#
+# Licensed under the GNU Affero General Public License 3.0 (the "License").
+# A copy of the License may be obtained with this software package or at
+#
+#      https://www.gnu.org/licenses/agpl-3.0.en.html
+#
+# Use of this file is prohibited except in compliance with the License. Any
+# modifications or derivative works of this file must retain this copyright
+# notice, and modified files must contain a notice indicating that they have
+# been altered from the originals.
+#
+# Covalent is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE. See the License for more details.
+#
+# Relief from the License may be granted by purchasing a commercial license.
 
 """Slurm executor plugin for the Covalent dispatcher."""
 
@@ -10,8 +26,9 @@ import subprocess
 import sys
 import tempfile
 import time
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import cloudpickle as pickle
 from covalent._shared_files.logger import app_log
@@ -52,7 +69,137 @@ class SlurmExecutor(BaseExecutor):
         self.ssh_key_file = ssh_key_file
         self.remote_workdir = remote_workdir
         self.poll_freq = poll_freq
-        self.options = options
+        self.options = deepcopy(options)
+
+    def execute(
+        self,
+        function: TransportableObject,
+        args: List,
+        kwargs: Dict,
+        dispatch_id: str,
+        results_dir: str,
+        node_id: int = -1,
+    ) -> Tuple[Any, str, str]:
+
+        dispatch_info = DispatchInfo(dispatch_id)
+        result_filename = f"result-{dispatch_id}-{node_id}.pkl"
+        slurm_filename = f"slurm-{dispatch_id}-{node_id}.sh"
+        task_results_dir = os.path.join(results_dir, dispatch_id)
+
+        if "output" not in self.options:
+            self.options["output"] = os.path.join(
+                self.remote_workdir, f"stdout-{dispatch_id}-{node_id}.log"
+            )
+        if "error" not in self.options:
+            self.options["error"] = os.path.join(
+                self.remote_workdir, f"stderr-{dispatch_id}-{node_id}.log"
+            )
+
+        with self.get_dispatch_context(dispatch_info), tempfile.NamedTemporaryFile(
+            dir=self.cache_dir, delete=False
+        ) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w", delete=False) as g:
+
+            # Write the serialized function to file
+            pickle.dump(function, f)
+            f.flush()
+
+            # Create the remote directory
+            subprocess.run(
+                [
+                    "ssh",
+                    "-i",
+                    self.ssh_key_file,
+                    "-o",
+                    "StrictHostKeyChecking=no",
+                    "-o",
+                    "UserKnownHostsFile=/dev/null",
+                    "-o",
+                    "LogLevel=ERROR",
+                    f"{self.username}@{self.address}",
+                    "mkdir",
+                    "-p",
+                    self.remote_workdir,
+                ],
+                check=True,
+                capture_output=True,
+            )
+
+            # Copy the function to the remote filesystem
+            func_filename = f"func-{dispatch_id}-{node_id}.pkl"
+            remote_func_filename = os.path.join(self.remote_workdir, func_filename)
+            subprocess.run(
+                [
+                    "rsync",
+                    "-e",
+                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                    f.name,
+                    f"{self.username}@{self.address}:{remote_func_filename}",
+                ],
+                check=True,
+                capture_output=True,
+            )
+
+            # Format the SLURM submit script
+            slurm_submit_script = self._format_submit_script(
+                func_filename,
+                result_filename,
+                function.python_version,
+                dispatch_id,
+                node_id,
+                args,
+                kwargs,
+            )
+            g.write(slurm_submit_script)
+            g.flush()
+
+            # Copy the script to the local results directory
+            local_slurm_filename = os.path.join(task_results_dir, "slurm.sh")
+            shutil.copyfile(g.name, local_slurm_filename)
+
+            # Copy the script to the remote filesystem
+            remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
+            subprocess.run(
+                [
+                    "rsync",
+                    "-e",
+                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                    g.name,
+                    f"{self.username}@{self.address}:{remote_slurm_filename}",
+                ],
+                check=True,
+                capture_output=True,
+            )
+
+            # Execute the script
+            remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
+            proc = subprocess.run(
+                [
+                    "ssh",
+                    "-i",
+                    self.ssh_key_file,
+                    "-o",
+                    "StrictHostKeyChecking=no",
+                    "-o",
+                    "UserKnownHostsFile=/dev/null",
+                    "-o",
+                    "LogLevel=ERROR",
+                    f"{self.username}@{self.address}",
+                    "/bin/bash",
+                    "-l",
+                    "-c",
+                    f'"sbatch {remote_slurm_filename}"',
+                ],
+                capture_output=True,
+            )
+            app_log.warning(f"RETCODE: {proc.returncode}")
+            if proc.returncode == 0:
+                slurm_job_id = int(proc.stdout.decode("utf-8").strip().split(";")[0])
+            else:
+                raise Exception(proc.stderr)
+
+            self._poll_slurm(slurm_job_id)
+
+            return self._query_result(result_filename, task_results_dir)
 
     def _format_submit_script(
         self,
@@ -139,126 +286,6 @@ wait
 
         return slurm_submit_script
 
-    def execute(
-        self,
-        function: TransportableObject,
-        args: List,
-        kwargs: Dict,
-        dispatch_id: str,
-        results_dir: str,
-        node_id: int = -1,
-    ) -> Any:
-
-        dispatch_info = DispatchInfo(dispatch_id)
-        result_filename = f"result-{dispatch_id}-{node_id}.pkl"
-        slurm_filename = f"slurm-{dispatch_id}-{node_id}.sh"
-        task_results_dir = os.path.join(results_dir, dispatch_id)
-
-        with self.get_dispatch_context(dispatch_info), tempfile.NamedTemporaryFile(
-            dir=self.cache_dir, delete=False
-        ) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w", delete=False) as g:
-
-            # Write the serialized function to file
-            pickle.dump(function, f)
-            f.flush()
-
-            # Create the remote directory
-            subprocess.run(
-                [
-                    "ssh",
-                    "-i",
-                    self.ssh_key_file,
-                    "-o",
-                    "StrictHostKeyChecking=no",
-                    "-o",
-                    "UserKnownHostsFile=/dev/null",
-                    "-o",
-                    "LogLevel=ERROR",
-                    f"{self.username}@{self.address}",
-                    "mkdir",
-                    "-p",
-                    self.remote_workdir,
-                ],
-                check=True,
-                capture_output=True,
-            )
-
-            # Copy the function to the remote filesystem
-            func_filename = f"func-{dispatch_id}-{node_id}.pkl"
-            remote_func_filename = os.path.join(self.remote_workdir, func_filename)
-            subprocess.run(
-                [
-                    "rsync",
-                    "-e",
-                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
-                    f.name,
-                    f"{self.username}@{self.address}:{remote_func_filename}",
-                ],
-                check=True,
-                capture_output=True,
-            )
-
-            # Format the SLURM submit script
-            slurm_submit_script = self._format_submit_script(
-                func_filename,
-                result_filename,
-                function.python_version,
-                dispatch_id,
-                node_id,
-                args,
-                kwargs,
-            )
-            g.write(slurm_submit_script)
-            g.flush()
-
-            # Copy the script to the local results directory
-            slurm_filename = os.path.join(task_results_dir, slurm_filename)
-            shutil.copyfile(g.name, slurm_filename)
-
-            # Copy the script to the remote filesystem
-            subprocess.run(
-                [
-                    "rsync",
-                    "-e",
-                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
-                    slurm_filename,
-                    f"{self.username}@{self.address}:{self.remote_workdir}",
-                ],
-                check=True,
-                capture_output=True,
-            )
-
-            # Execute the script
-            remote_slurm_filename = os.path.join(self.remote_workdir, slurm_submit_script)
-            proc = subprocess.run(
-                [
-                    "ssh",
-                    "-i",
-                    self.ssh_key_file,
-                    "-o",
-                    "StrictHostKeyChecking=no",
-                    "-o",
-                    "UserKnownHostsFile=/dev/null",
-                    "-o",
-                    "LogLevel=ERROR",
-                    f"{self.username}@{self.address}",
-                    "/bin/bash",
-                    "-l",
-                    "-c",
-                    f'"sbatch {remote_slurm_filename}"',
-                ],
-                capture_output=True,
-            )
-            app_log.warning(f"RETCODE: {proc.returncode}")
-            if proc.returncode == 0:
-                slurm_job_id = int(proc.stdout.decode("utf-8").strip().split(";")[0])
-            else:
-                print(proc.stderr, file=sys.stdout)
-                return
-
-            # TODO: Need to return stdout and stderr as well
-            return self._poll_slurm(slurm_job_id, result_filename, task_results_dir)
-
     def _get_job_status(self, job_id: int) -> str:
         """Query the status of a job previously submitted to Slurm.
 
@@ -291,20 +318,18 @@ wait
         )
         return proc.stdout.decode("utf-8").strip()
 
-    def _poll_slurm(self, job_id: int, result_filename: str, task_results_dir: str) -> Any:
-        """Poll a Slurm job until completion and retrieve the result.
+    def _poll_slurm(self, job_id: int) -> None:
+        """Poll a Slurm job until completion.
 
         Args:
             job_id: Slurm job ID.
-            result_filename: Name of the pickled result file.
-            task_results_dir: Directory on the Covalent server where the result will be copied.
 
         Returns:
-            result: Task result.
+            None
         """
 
         # Poll status every `poll_freq` seconds
-        status = self.get_job_status(job_id)
+        status = self._get_job_status(job_id)
         while (
             "PENDING" in status
             or "RUNNING" in status
@@ -312,11 +337,21 @@ wait
             or "CONFIGURING" in status
         ):
             time.sleep(self.poll_freq)
-            status = self.get_job_status(job_id)
+            status = self._get_job_status(job_id)
 
         if "COMPLETED" not in status:
             raise Exception("Job failed with status:\n", status)
 
+    def _query_result(self, result_filename: str, task_results_dir: str) -> Any:
+        """Query and retrieve the task result including stdout and stderr logs.
+
+        Args:
+            result_filename: Name of the pickled result file.
+            task_results_dir: Directory on the Covalent server where the result will be copied.
+
+        Returns:
+            result: Task result.
+        """
         # Check the result file exists on the remote backend
         remote_result_filename = os.path.join(self.remote_workdir, result_filename)
         proc = subprocess.run(
@@ -353,7 +388,43 @@ wait
             capture_output=True,
         )
 
-        with open(result_filename, "rb") as f:
-            result = pickle.load(f)
+        # Copy stdout, stderr from backend to Covalent server
+        subprocess.run(
+            [
+                "rsync",
+                "-e",
+                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                f"{self.username}@{self.address}:{self.options['output']}",
+                task_results_dir,
+            ],
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            [
+                "rsync",
+                "-e",
+                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                f"{self.username}@{self.address}:{self.options['error']}",
+                task_results_dir,
+            ],
+            check=True,
+            capture_output=True,
+        )
 
-        return result
+        local_result_filename = os.path.join(task_results_dir, result_filename)
+        with open(local_result_filename, "rb") as f:
+            result = pickle.load(f)
+        os.remove(local_result_filename)
+
+        stdout_file = os.path.join(task_results_dir, os.path.basename(self.options["output"]))
+        with open(stdout_file) as f:
+            stdout = f.read()
+        os.remove(stdout_file)
+
+        stderr_file = os.path.join(task_results_dir, os.path.basename(self.options["error"]))
+        with open(stderr_file) as f:
+            stderr = f.read()
+        os.remove(stderr_file)
+
+        return result, stdout, stderr
