@@ -1,0 +1,74 @@
+# Copyright 2021 Agnostiq Inc.
+#
+# This file is part of Covalent.
+# 
+# Licensed under the GNU Affero General Public License 3.0 (the "License"). 
+# A copy of the License may be obtained with this software package or at
+#
+#      https://www.gnu.org/licenses/agpl-3.0.en.html
+#
+# Use of this file is prohibited except in compliance with the License. Any 
+# modifications or derivative works of this file must retain this copyright 
+# notice, and modified files must contain a notice indicating that they have 
+# been altered from the originals.
+#
+# Covalent is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE. See the License for more details.
+#
+# Relief from the License may be granted by purchasing a commercial license.
+
+name: tests
+
+on: 
+  pull_request:
+  push:
+    branches:
+      - develop
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ['ubuntu-latest']
+        container:
+          - python:3.8-buster
+          - python:3.8-bullseye
+          - python:3.9-buster
+          - python:3.9-bullseye
+          - centos/python-38-centos7
+        experimental: [false]
+        include:
+          - os: macos-latest
+            python-version: '3.8'
+            experimental: false
+    container: ${{ matrix.container }}
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - name: Check out head
+        uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        if: matrix.os == 'macos-latest'
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Python dependencies
+        run: |
+          pip install --no-cache-dir -r ./requirements.txt
+      - name: Install Covalent
+        run: pip install cova
+      - name: Install Slurm Plugin
+        run: pip install -e .
+      - name: Test plugin loading
+        run: python -c "from covalent.executor import SlurmExecutor"
+      - name: Push to main
+        if: github.ref == 'refs/heads/develop' && matrix.os == 'ubuntu-latest' && matrix.container == 'python:3.8-buster'
+        run: |
+          git config user.name "CovalentOpsBot"
+          git config user.email "covalentopsbot@users.noreply.github.com"
+          git remote set-url origin https://${{ secrets.COVALENT_OPS_BOT_TOKEN }}@github.com/AgnostiqHQ/covalent-slurm-plugin.git
+          git fetch --unshallow
+          git push origin HEAD:main
