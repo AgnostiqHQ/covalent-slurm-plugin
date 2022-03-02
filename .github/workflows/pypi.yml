@@ -48,8 +48,8 @@ jobs:
           tar xzf covalent-slurm-plugin-${VERSION}.tar.gz
           test -e covalent-slurm-plugin-${VERSION}/slurm.py
           rm -rf cova-${VERSION}/
-      - name: Upload Distribution
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: twine upload dist/*
+#      - name: Upload Distribution
+#        env:
+#          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+#          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+#        run: twine upload dist/*
