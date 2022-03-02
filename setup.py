@@ -31,7 +31,7 @@ with open("VERSION") as f:
 with open("requirements.txt") as f:
     required = f.read().splitlines()
 
-plugins_list = ["slurm = slurm"]
+plugins_list = ["slurm = covalent_slurm_plugin.slurm"]
 
 setup_info = {
     "name": "covalent-slurm-plugin",
