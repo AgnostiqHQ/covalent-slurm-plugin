@@ -59,7 +59,7 @@ jobs:
         run: |
           pip install --no-cache-dir -r ./requirements.txt
       - name: Install Covalent
-        run: pip install cova
+        run: pip install cova --pre
       - name: Install Slurm Plugin
         run: pip install -e .
       - name: Test plugin loading

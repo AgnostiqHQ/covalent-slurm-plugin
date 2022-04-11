@@ -45,7 +45,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     },
 }
 
-executor_plugin_name = "SlurmExecutor"
+EXECUTOR_PLUGIN_NAME = "SlurmExecutor"
 
 
 class SlurmExecutor(BaseExecutor):
