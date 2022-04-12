@@ -21,15 +21,17 @@
 """Slurm executor plugin for the Covalent dispatcher."""
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
-import re
 import time
 from copy import deepcopy
-from typing import Any, Dict, List, Tuple
+from multiprocessing import Queue as MPQ
+from typing import Any, Dict, List, Union
 
 import cloudpickle as pickle
+from covalent._results_manager.result import Result
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent._workflow.transport import TransportableObject
 from covalent.executor import BaseExecutor
@@ -86,24 +88,49 @@ class SlurmExecutor(BaseExecutor):
         function: TransportableObject,
         args: List,
         kwargs: Dict,
+        info_queue: MPQ,
+        task_id: int,
         dispatch_id: str,
         results_dir: str,
-        node_id: int = -1,
-    ) -> Tuple[Any, str, str]:
+    ) -> Any:
+        """
+        Executes the input function and returns the result.
+
+        Args:
+            function: The input python function which will be executed and whose result
+                      is ultimately returned by this function.
+            args: List of positional arguments to be used by the function.
+            kwargs: Dictionary of keyword arguments to be used by the function.
+            info_queue: A multiprocessing Queue object used for shared variables across
+                processes. Information about, eg, status, can be stored here.
+            task_id: The ID of this task in the bigger workflow graph.
+            dispatch_id: The unique identifier of the external lattice process which is
+                         calling this function.
+            results_dir: The location of the results directory.
+
+        Returns:
+            output: The result of the executed function.
+        """
 
         dispatch_info = DispatchInfo(dispatch_id)
-        result_filename = f"result-{dispatch_id}-{node_id}.pkl"
-        slurm_filename = f"slurm-{dispatch_id}-{node_id}.sh"
+        result_filename = f"result-{dispatch_id}-{task_id}.pkl"
+        slurm_filename = f"slurm-{dispatch_id}-{task_id}.sh"
         task_results_dir = os.path.join(results_dir, dispatch_id)
 
         if "output" not in self.options:
             self.options["output"] = os.path.join(
-                self.remote_workdir, f"stdout-{dispatch_id}-{node_id}.log"
+                self.remote_workdir, f"stdout-{dispatch_id}-{task_id}.log"
             )
         if "error" not in self.options:
             self.options["error"] = os.path.join(
-                self.remote_workdir, f"stderr-{dispatch_id}-{node_id}.log"
+                self.remote_workdir, f"stderr-{dispatch_id}-{task_id}.log"
             )
+
+        result = None
+        exception = None
+
+        info_dict = {"STATUS": Result.RUNNING}
+        info_queue.put_nowait(info_dict)
 
         with self.get_dispatch_context(dispatch_info), tempfile.NamedTemporaryFile(
             dir=self.cache_dir, delete=False
@@ -135,7 +162,7 @@ class SlurmExecutor(BaseExecutor):
             )
 
             # Copy the function to the remote filesystem
-            func_filename = f"func-{dispatch_id}-{node_id}.pkl"
+            func_filename = f"func-{dispatch_id}-{task_id}.pkl"
             remote_func_filename = os.path.join(self.remote_workdir, func_filename)
             subprocess.run(
                 [
@@ -201,16 +228,22 @@ class SlurmExecutor(BaseExecutor):
                 ],
                 capture_output=True,
             )
-
-			# proc.stdout is `Submitted batch job <jobid>`
             if proc.returncode == 0:
-                slurm_job_id = int(re.findall('[0-9]+', proc.stdout.decode("utf-8"))[0])
+                slurm_job_id = int(re.findall("[0-9]+", proc.stdout.decode("utf-8"))[0])
             else:
                 raise Exception(proc.stderr)
 
             self._poll_slurm(slurm_job_id)
 
-            return self._query_result(result_filename, task_results_dir)
+            result, stdout, stderr, exception = self._query_result(
+                result_filename, task_results_dir
+            )
+
+            info_dict = info_queue.get()
+            info_dict["STATUS"] = Result.FAILED if result is None else Result.COMPLETED
+            info_queue.put(info_dict)
+
+            return result, stdout, stderr, exception
 
     def _format_submit_script(
         self,
@@ -277,10 +310,16 @@ import cloudpickle as pickle
 with open("{func_filename}", "rb") as f:
     function = pickle.load(f).get_deserialized()
 
-result = function(*{args}, **{kwargs})
+result = None
+exception = None
+
+try:
+    result = function(*{args}, **{kwargs})
+except Exception as e:
+    exception = e
 
 with open("{result_filename}", "wb") as f:
-    pickle.dump(result, f)
+    pickle.dump((result, exception), f)
 EOF
 
 wait
@@ -295,15 +334,21 @@ wait
 
         return slurm_submit_script
 
-    def get_status(self, job_id: str) -> str:
+    def get_status(self, info_dict: dict) -> Union[Result, str]:
         """Query the status of a job previously submitted to Slurm.
 
         Args:
-            job_id: Slurm job ID.
+            info_dict: a dictionary containing all neccessary parameters needed to query the
+                status of the execution. Required keys in the dictionary are:
+                    A string mapping "job_id" to Slurm job ID.
 
         Returns:
             status: String describing the job status.
         """
+
+        job_id = info_dict.get("job_id", None)
+        if job_id is None:
+            return Result.NEW_OBJ
 
         proc = subprocess.run(
             [
@@ -426,7 +471,7 @@ wait
 
         local_result_filename = os.path.join(task_results_dir, result_filename)
         with open(local_result_filename, "rb") as f:
-            result = pickle.load(f)
+            result, exception = pickle.load(f)
         os.remove(local_result_filename)
 
         stdout_file = os.path.join(task_results_dir, os.path.basename(self.options["output"]))
@@ -439,14 +484,4 @@ wait
             stderr = f.read()
         os.remove(stderr_file)
 
-        return result, stdout, stderr
-
-    def cancel(self, job_id: int) -> None:
-        """Cancel a Slurm job.
-
-        Args:
-            job_id: Slurm job ID.
-
-        Returns:
-            None
-        """
+        return result, stdout, stderr, exception
