@@ -24,7 +24,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-import time
+import re
 from copy import deepcopy
 from typing import Any, Dict, List, Tuple
 
@@ -200,8 +200,10 @@ class SlurmExecutor(BaseExecutor):
                 ],
                 capture_output=True,
             )
+
+			# proc.stdout is `Submitted batch job <jobid>`
             if proc.returncode == 0:
-                slurm_job_id = int(proc.stdout.decode("utf-8").strip().split(";")[0])
+                slurm_job_id = int(re.findall('[0-9]+', proc.stdout.decode("utf-8"))[0])
             else:
                 raise Exception(proc.stderr)
 
