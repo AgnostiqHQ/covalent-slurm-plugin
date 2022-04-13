@@ -190,7 +190,7 @@ class SlurmExecutor(BaseExecutor):
 
             # Copy the script to the local results directory
             local_slurm_filename = os.path.join(task_results_dir, "slurm.sh")
-            shutil.copyfile(g.name, local_slurm_filename)
+            #shutil.copyfile(g.name, local_slurm_filename)
 
             # Copy the script to the remote filesystem
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
@@ -345,7 +345,6 @@ wait
         Returns:
             status: String describing the job status.
         """
-
         job_id = info_dict.get("job_id", None)
         if job_id is None:
             return Result.NEW_OBJ
@@ -383,7 +382,8 @@ wait
         """
 
         # Poll status every `poll_freq` seconds
-        status = self.get_status(str(job_id))
+        status = self.get_status({"job_id": str(job_id)})
+        #status = self.get_status(str(job_id))
         while (
             "PENDING" in status
             or "RUNNING" in status
@@ -391,7 +391,8 @@ wait
             or "CONFIGURING" in status
         ):
             time.sleep(self.poll_freq)
-            status = self.get_status(str(job_id))
+            status = self.get_status({"job_id": str(job_id)})
+            #status = self.get_status(str(job_id))
 
         if "COMPLETED" not in status:
             raise Exception("Job failed with status:\n", status)
