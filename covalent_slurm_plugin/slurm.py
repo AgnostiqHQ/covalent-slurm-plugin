@@ -133,8 +133,7 @@ class SlurmExecutor(BaseExecutor):
         info_queue.put_nowait(info_dict)
 
         with self.get_dispatch_context(dispatch_info), tempfile.NamedTemporaryFile(
-            dir=self.cache_dir, delete=False
-        ) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w", delete=False) as g:
+            dir=self.cache_dir) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as g:
 
             # Write the serialized function to file
             pickle.dump(function, f)
@@ -438,7 +437,7 @@ wait
                 f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
                 "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                 f"{self.username}@{self.address}:{remote_result_filename}",
-                task_results_dir,
+                task_results_dir+"/",
             ],
             check=True,
             capture_output=True,
@@ -452,7 +451,7 @@ wait
                 f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
                 "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                 f"{self.username}@{self.address}:{self.options['output']}",
-                task_results_dir,
+                task_results_dir+"/",
             ],
             check=True,
             capture_output=True,
@@ -464,7 +463,7 @@ wait
                 f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
                 "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                 f"{self.username}@{self.address}:{self.options['error']}",
-                task_results_dir,
+                task_results_dir+"/",
             ],
             check=True,
             capture_output=True,
