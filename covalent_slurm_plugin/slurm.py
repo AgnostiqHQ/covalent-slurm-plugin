@@ -32,9 +32,13 @@ from typing import Any, Dict, List, Union
 
 import cloudpickle as pickle
 from covalent._results_manager.result import Result
+from covalent._shared_files import logger
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent._workflow.transport import TransportableObject
 from covalent.executor import BaseExecutor
+
+app_log = logger.app_log
+log_stack_info = logger.log_stack_info
 
 _EXECUTOR_PLUGIN_DEFAULTS = {
     "username": "",
@@ -163,6 +167,7 @@ class SlurmExecutor(BaseExecutor):
             # Copy the function to the remote filesystem
             func_filename = f"func-{dispatch_id}-{task_id}.pkl"
             remote_func_filename = os.path.join(self.remote_workdir, func_filename)
+
             subprocess.run(
                 [
                     "rsync",
@@ -176,11 +181,13 @@ class SlurmExecutor(BaseExecutor):
                 capture_output=True,
             )
 
+            func_py_version = ".".join(function.python_version.split(".")[:2])
+
             # Format the SLURM submit script
             slurm_submit_script = self._format_submit_script(
                 func_filename,
                 result_filename,
-                function.python_version,
+                func_py_version,
                 args,
                 kwargs,
             )
@@ -293,9 +300,9 @@ fi
         )
 
         slurm_python_version = """
-if [[ "{python_version}" != `python -V | awk '{{print $2}}'` ]] ; then
-  >&2 echo "Python version mismatch. Please install Python {python_version} in the compute "\
-  "environment."
+remote_py_version=$(python -c "print(__import__('sys').version_info[0])").$(python -c "print(__import__('sys').version_info[1])")
+if [[ "{python_version}" != $remote_py_version ]] ; then
+  >&2 echo "Python version mismatch. Please install Python {python_version} in the compute environment."
   exit 199
 fi
 """.format(
