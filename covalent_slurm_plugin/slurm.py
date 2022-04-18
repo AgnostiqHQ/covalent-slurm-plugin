@@ -140,7 +140,7 @@ class SlurmExecutor(BaseExecutor):
             dir=self.cache_dir) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as g:
 
             # Write the serialized function to file
-            pickle.dump(function, f)
+            pickle.dump((function, args, kwargs), f)
             f.flush()
 
             # Create the remote directory
@@ -188,8 +188,6 @@ class SlurmExecutor(BaseExecutor):
                 func_filename,
                 result_filename,
                 func_py_version,
-                args,
-                kwargs,
             )
             g.write(slurm_submit_script)
             g.flush()
@@ -256,8 +254,6 @@ class SlurmExecutor(BaseExecutor):
         func_filename: str,
         result_filename: str,
         python_version: str,
-        args: List,
-        kwargs: Dict,
     ) -> str:
         """Create a SLURM script which wraps a pickled Python function.
 
@@ -265,8 +261,6 @@ class SlurmExecutor(BaseExecutor):
             func_filename: Name of the pickled function.
             result_filename: Name of the pickled result.
             python_version: Python version required by the pickled function.
-            args: Positional arguments consumed by the task.
-            kwargs: Keyword arguments consumed by the task.
 
         Returns:
             script: String object containing a script parsable by sbatch.
@@ -314,13 +308,14 @@ python - <<EOF
 import cloudpickle as pickle
 
 with open("{func_filename}", "rb") as f:
-    function = pickle.load(f).get_deserialized()
+    function, args, kwargs = pickle.load(f)
+    function = function.get_deserialized()
 
 result = None
 exception = None
 
 try:
-    result = function(*{args}, **{kwargs})
+    result = function(*args, **kwargs)
 except Exception as e:
     exception = e
 
@@ -331,8 +326,6 @@ EOF
 wait
 """.format(
             func_filename=os.path.join(self.remote_workdir, func_filename),
-            args=args,
-            kwargs=kwargs,
             result_filename=os.path.join(self.remote_workdir, result_filename),
         )
 
