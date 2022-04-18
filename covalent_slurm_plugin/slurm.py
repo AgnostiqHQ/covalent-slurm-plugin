@@ -139,8 +139,9 @@ class SlurmExecutor(BaseExecutor):
         with self.get_dispatch_context(dispatch_info), tempfile.NamedTemporaryFile(
             dir=self.cache_dir) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as g:
 
-            # Write the serialized function to file
-            pickle.dump((function, args, kwargs), f)
+            # Write the deserialized function to file
+            fn = function.get_deserialized()
+            pickle.dump((fn, args, kwargs), f)
             f.flush()
 
             # Create the remote directory
@@ -309,7 +310,6 @@ import cloudpickle as pickle
 
 with open("{func_filename}", "rb") as f:
     function, args, kwargs = pickle.load(f)
-    function = function.get_deserialized()
 
 result = None
 exception = None
