@@ -20,16 +20,15 @@
 
 """Tests for the SSH executor plugin."""
 
-#from multiprocessing import Queue as MPQ
+import cloudpickle as pickle
 import os
 import subprocess
-#from unittest.mock import patch, mock_open
+from unittest import mock
 
 import covalent as ct
 from covalent._results_manager.result import Result
 from covalent._workflow.transport import TransportableObject
 from covalent.executor import SlurmExecutor
-#from covalent._shared_files.config import get_config, update_config
 
 def test_init():
     """Test that initialization properly sets member variables."""
@@ -174,7 +173,7 @@ def test_query_result(mocker):
 
     # First test when the remote result file is not found by mocking the return code
     # of subprocess.run with a non-zero value.
-    subproc_mock = mocker.patch(
+    mocker.patch(
         "subprocess.run",
         return_value = subprocess.CompletedProcess(
             args = [],
@@ -189,9 +188,8 @@ def test_query_result(mocker):
         assert type(raised_exception) == type(expected_exception)
         assert raised_exception.args == expected_exception.args
 
-    '''
     # Now mock result files.
-    subproc_mock = mocker.patch(
+    mocker.patch(
         "subprocess.run",
         return_value = subprocess.CompletedProcess(
             args = [],
@@ -199,12 +197,38 @@ def test_query_result(mocker):
         )
     )
 
-    osremove_mock = mocker.patch("os.remove", return_value = None)
+    # Don't actually try to remove result files:
+    mocker.patch("os.remove", return_value = None)
+    # Mock the opening of specific result files:
+    expected_results = [1,2,3,4,5]
+    expected_error = None
+    expected_stdout = "output logs"
+    expected_stderr = "output errors"
+    pickle_mock = mocker.patch("cloudpickle.load", return_value = (expected_results,expected_error))
+    unpatched_open = open
+    def mock_open(*args, **kwargs):
+        if args[0] == "mock_result":
+            return mock.mock_open(read_data=None)(*args, **kwargs)
+        elif args[0] == executor.options["output"]:
+            return mock.mock_open(read_data=expected_stdout)(*args, **kwargs)
+        elif args[0] == executor.options["error"]:
+            return mock.mock_open(read_data=expected_stderr)(*args, **kwargs)
+        else:
+            return unpatched_open(*args, **kwargs)
 
-    result, stdout, stderr, exception = executor._query_result(
-        result_filename = "mock_result",
-        task_results_dir = ""
-    )
-    '''
+    with mock.patch("builtins.open", mock_open):
+
+        result, stdout, stderr, exception = executor._query_result(
+            result_filename = "mock_result",
+            task_results_dir = ""
+        )
+
+        assert result == expected_results
+        assert exception == expected_error
+        assert stdout == expected_stdout
+        assert stderr == expected_stderr
+        pickle_mock.assert_called_once()
+        
+    
 
 
