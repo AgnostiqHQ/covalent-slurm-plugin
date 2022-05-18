@@ -247,6 +247,9 @@ class SlurmExecutor(BaseExecutor):
                 result_filename, task_results_dir
             )
 
+            if exception:
+                raise exception
+
             if info_queue:
                 info_dict = info_queue.get()
                 info_dict["STATUS"] = Result.FAILED if result is None else Result.COMPLETED
