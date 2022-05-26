@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- New logo to reflect revamp in UI.
+- Reverted some changes in slurm.py.
+
+### Fixed
+
+- Handle exceptions correctly
+
 ## [0.2.5] - 2022-05-26
 
 ### Fixed

@@ -20,34 +20,34 @@
 
 """Tests for the SSH executor plugin."""
 
-import cloudpickle as pickle
 import os
 import subprocess
 from unittest import mock
 
+import cloudpickle as pickle
 import covalent as ct
 from covalent._results_manager.result import Result
 from covalent._workflow.transport import TransportableObject
 from covalent.executor import SlurmExecutor
 
+
 def test_init():
     """Test that initialization properly sets member variables."""
 
-    username = os.getenv("SLURM_USERNAME","username")
-    host = os.getenv("SLURM_CLUSTER_ADDR","host")
+    username = os.getenv("SLURM_USERNAME", "username")
+    host = os.getenv("SLURM_CLUSTER_ADDR", "host")
     key_file = os.getenv(
-        "SLURM_SSH_KEY_FILE",
-        os.path.join(os.getenv("HOME","~/"), ".ssh/id_rsa")
+        "SLURM_SSH_KEY_FILE", os.path.join(os.getenv("HOME", "~/"), ".ssh/id_rsa")
     )
-    remote_username = os.getenv("SLURM_USERNAME","remote_username")
+    remote_username = os.getenv("SLURM_USERNAME", "remote_username")
 
     executor = ct.executor.SlurmExecutor(
-        username = username,
-        address = host,
-        ssh_key_file = key_file,
-        remote_workdir = f"/federation/{remote_username}/.cache/covalent",
-        poll_freq = 30,
-        options = {}
+        username=username,
+        address=host,
+        ssh_key_file=key_file,
+        remote_workdir=f"/federation/{remote_username}/.cache/covalent",
+        poll_freq=30,
+        options={},
     )
 
     assert executor.username == username
@@ -57,19 +57,20 @@ def test_init():
     assert executor.poll_freq == 30
     assert executor.options == {}
     assert executor.conda_env == ""
-    assert executor.current_env_on_conda_fail == False
+    assert executor.current_env_on_conda_fail is False
+
 
 def test_format_submit_script():
     """Test that the script (in string form) which is to be run on the remote server is
-        created with no errors."""
+    created with no errors."""
 
     executor = ct.executor.SlurmExecutor(
-        username = "test_user",
-        address = "test_address",
-        ssh_key_file = "~/.ssh/id_rsa",
-        remote_workdir = f"/federation/test_user/.cache/covalent",
-        poll_freq = 30,
-        options = {}
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/federation/test_user/.cache/covalent",
+        poll_freq=30,
+        options={},
     )
 
     def simple_task(x):
@@ -89,16 +90,17 @@ def test_format_submit_script():
         python_version,
     )
 
+
 def test_get_status(mocker):
     """Test the get_status method."""
 
     executor = ct.executor.SlurmExecutor(
-        username = "test_user",
-        address = "test_address",
-        ssh_key_file = "~/.ssh/id_rsa",
-        remote_workdir = f"/federation/test_user/.cache/covalent",
-        poll_freq = 30,
-        options = {}
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/federation/test_user/.cache/covalent",
+        poll_freq=30,
+        options={},
     )
 
     status = executor.get_status({})
@@ -106,36 +108,37 @@ def test_get_status(mocker):
 
     subproc_mock = mocker.patch(
         "subprocess.run",
-        return_value = subprocess.CompletedProcess(
-            args = [],
-            returncode = 0,
-            stdout = "Fake Status".encode("utf-8"),
-        )
+        return_value=subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="Fake Status".encode("utf-8"),
+        ),
     )
 
     status = executor.get_status({"job_id": 0})
     assert status == "Fake Status"
     subproc_mock.assert_called_once()
 
+
 def test_poll_slurm(mocker):
     """Test that polling the status works."""
 
     executor = ct.executor.SlurmExecutor(
-        username = "test_user",
-        address = "test_address",
-        ssh_key_file = "~/.ssh/id_rsa",
-        remote_workdir = f"/federation/test_user/.cache/covalent",
-        poll_freq = 30,
-        options = {}
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/federation/test_user/.cache/covalent",
+        poll_freq=30,
+        options={},
     )
 
     subproc_mock = mocker.patch(
         "subprocess.run",
-        return_value = subprocess.CompletedProcess(
-            args = [],
-            returncode = 0,
-            stdout = "COMPLETED".encode("utf-8"),
-        )
+        return_value=subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="COMPLETED".encode("utf-8"),
+        ),
     )
     executor._poll_slurm(0)
     subproc_mock.assert_called_once()
@@ -144,11 +147,11 @@ def test_poll_slurm(mocker):
     # correct exception is raised.
     subproc_mock = mocker.patch(
         "subprocess.run",
-        return_value = subprocess.CompletedProcess(
-            args = [],
-            returncode = 0,
-            stdout = "AN ERROR".encode("utf-8"),
-        )
+        return_value=subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="AN ERROR".encode("utf-8"),
+        ),
     )
 
     try:
@@ -159,30 +162,31 @@ def test_poll_slurm(mocker):
         assert raised_exception.args == expected_exception.args
     subproc_mock.assert_called_once()
 
+
 def test_query_result(mocker):
     """Test querying results works as expected"""
-    
+
     executor = ct.executor.SlurmExecutor(
-        username = "test_user",
-        address = "test_address",
-        ssh_key_file = "~/.ssh/id_rsa",
-        remote_workdir = f"/federation/test_user/.cache/covalent",
-        poll_freq = 30,
-        options = {"output": "stdout_file", "error": "stderr_file"}
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/federation/test_user/.cache/covalent",
+        poll_freq=30,
+        options={"output": "stdout_file", "error": "stderr_file"},
     )
 
     # First test when the remote result file is not found by mocking the return code
     # of subprocess.run with a non-zero value.
     mocker.patch(
         "subprocess.run",
-        return_value = subprocess.CompletedProcess(
-            args = [],
-            returncode = 1,
-        )
+        return_value=subprocess.CompletedProcess(
+            args=[],
+            returncode=1,
+        ),
     )
 
     try:
-        executor._query_result(result_filename = "mock_result", task_results_dir = "")
+        executor._query_result(result_filename="mock_result", task_results_dir="")
     except Exception as raised_exception:
         expected_exception = FileNotFoundError(1, None)
         assert type(raised_exception) == type(expected_exception)
@@ -191,21 +195,22 @@ def test_query_result(mocker):
     # Now mock result files.
     mocker.patch(
         "subprocess.run",
-        return_value = subprocess.CompletedProcess(
-            args = [],
-            returncode = 0,
-        )
+        return_value=subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+        ),
     )
 
     # Don't actually try to remove result files:
-    mocker.patch("os.remove", return_value = None)
+    mocker.patch("os.remove", return_value=None)
     # Mock the opening of specific result files:
-    expected_results = [1,2,3,4,5]
+    expected_results = [1, 2, 3, 4, 5]
     expected_error = None
     expected_stdout = "output logs"
     expected_stderr = "output errors"
-    pickle_mock = mocker.patch("cloudpickle.load", return_value = (expected_results,expected_error))
+    pickle_mock = mocker.patch("cloudpickle.load", return_value=(expected_results, expected_error))
     unpatched_open = open
+
     def mock_open(*args, **kwargs):
         if args[0] == "mock_result":
             return mock.mock_open(read_data=None)(*args, **kwargs)
@@ -219,8 +224,7 @@ def test_query_result(mocker):
     with mock.patch("builtins.open", mock_open):
 
         result, stdout, stderr, exception = executor._query_result(
-            result_filename = "mock_result",
-            task_results_dir = ""
+            result_filename="mock_result", task_results_dir=""
         )
 
         assert result == expected_results
@@ -228,7 +232,3 @@ def test_query_result(mocker):
         assert stdout == expected_stdout
         assert stderr == expected_stderr
         pickle_mock.assert_called_once()
-        
-    
-
-

@@ -31,6 +31,7 @@ from multiprocessing import Queue as MPQ
 from typing import Any, Dict, List, Union
 
 import cloudpickle as pickle
+
 from covalent._results_manager.result import Result
 from covalent._shared_files import logger
 from covalent._shared_files.util_classes import DispatchInfo
@@ -52,7 +53,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     },
 }
 
-EXECUTOR_PLUGIN_NAME = "SlurmExecutor"
+executor_plugin_name = "SlurmExecutor"
 
 
 class SlurmExecutor(BaseExecutor):
@@ -92,10 +93,10 @@ class SlurmExecutor(BaseExecutor):
         function: TransportableObject,
         args: List,
         kwargs: Dict,
-        info_queue: MPQ,
-        task_id: int,
         dispatch_id: str,
         results_dir: str,
+        node_id: int = -1,
+        info_queue: MPQ = None,
     ) -> Any:
         """
         Executes the input function and returns the result.
@@ -107,7 +108,7 @@ class SlurmExecutor(BaseExecutor):
             kwargs: Dictionary of keyword arguments to be used by the function.
             info_queue: A multiprocessing Queue object used for shared variables across
                 processes. Information about, eg, status, can be stored here.
-            task_id: The ID of this task in the bigger workflow graph.
+            node_id: The ID of this task in the bigger workflow graph.
             dispatch_id: The unique identifier of the external lattice process which is
                          calling this function.
             results_dir: The location of the results directory.
@@ -117,27 +118,29 @@ class SlurmExecutor(BaseExecutor):
         """
 
         dispatch_info = DispatchInfo(dispatch_id)
-        result_filename = f"result-{dispatch_id}-{task_id}.pkl"
-        slurm_filename = f"slurm-{dispatch_id}-{task_id}.sh"
+        result_filename = f"result-{dispatch_id}-{node_id}.pkl"
+        slurm_filename = f"slurm-{dispatch_id}-{node_id}.sh"
         task_results_dir = os.path.join(results_dir, dispatch_id)
 
         if "output" not in self.options:
             self.options["output"] = os.path.join(
-                self.remote_workdir, f"stdout-{dispatch_id}-{task_id}.log"
+                self.remote_workdir, f"stdout-{dispatch_id}-{node_id}.log"
             )
         if "error" not in self.options:
             self.options["error"] = os.path.join(
-                self.remote_workdir, f"stderr-{dispatch_id}-{task_id}.log"
+                self.remote_workdir, f"stderr-{dispatch_id}-{node_id}.log"
             )
 
         result = None
         exception = None
 
-        info_dict = {"STATUS": Result.RUNNING}
-        info_queue.put_nowait(info_dict)
+        if info_queue:
+            info_dict = {"STATUS": Result.RUNNING}
+            info_queue.put_nowait(info_dict)
 
         with self.get_dispatch_context(dispatch_info), tempfile.NamedTemporaryFile(
-            dir=self.cache_dir) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as g:
+            dir=self.cache_dir
+        ) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as g:
 
             # Write the deserialized function to file
             fn = function.get_deserialized()
@@ -166,7 +169,7 @@ class SlurmExecutor(BaseExecutor):
             )
 
             # Copy the function to the remote filesystem
-            func_filename = f"func-{dispatch_id}-{task_id}.pkl"
+            func_filename = f"func-{dispatch_id}-{node_id}.pkl"
             remote_func_filename = os.path.join(self.remote_workdir, func_filename)
 
             subprocess.run(
@@ -195,7 +198,7 @@ class SlurmExecutor(BaseExecutor):
 
             # Copy the script to the local results directory
             local_slurm_filename = os.path.join(task_results_dir, "slurm.sh")
-            #shutil.copyfile(g.name, local_slurm_filename)
+            # shutil.copyfile(g.name, local_slurm_filename)
 
             # Copy the script to the remote filesystem
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
@@ -244,11 +247,17 @@ class SlurmExecutor(BaseExecutor):
                 result_filename, task_results_dir
             )
 
-            info_dict = info_queue.get()
-            info_dict["STATUS"] = Result.FAILED if result is None else Result.COMPLETED
-            info_queue.put(info_dict)
+            if exception:
+                raise exception
 
-            return result, stdout, stderr, exception
+            if info_queue:
+                info_dict = info_queue.get()
+                info_dict["STATUS"] = Result.FAILED if result is None else Result.COMPLETED
+                info_queue.put(info_dict)
+
+            # FIX: covalent-mono's _run_task should parse exceptions from executor.execute()
+            # return result, stdout, stderr, exception
+            return result, stdout, stderr
 
     def _format_submit_script(
         self,
@@ -382,7 +391,7 @@ wait
 
         # Poll status every `poll_freq` seconds
         status = self.get_status({"job_id": str(job_id)})
-        #status = self.get_status(str(job_id))
+        # status = self.get_status(str(job_id))
         while (
             "PENDING" in status
             or "RUNNING" in status
@@ -391,7 +400,7 @@ wait
         ):
             time.sleep(self.poll_freq)
             status = self.get_status({"job_id": str(job_id)})
-            #status = self.get_status(str(job_id))
+            # status = self.get_status(str(job_id))
 
         if "COMPLETED" not in status:
             raise Exception("Job failed with status:\n", status)
@@ -437,7 +446,7 @@ wait
                 f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
                 "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                 f"{self.username}@{self.address}:{remote_result_filename}",
-                task_results_dir+"/",
+                task_results_dir + "/",
             ],
             check=True,
             capture_output=True,
@@ -451,7 +460,7 @@ wait
                 f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
                 "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                 f"{self.username}@{self.address}:{self.options['output']}",
-                task_results_dir+"/",
+                task_results_dir + "/",
             ],
             check=True,
             capture_output=True,
@@ -463,7 +472,7 @@ wait
                 f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
                 "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
                 f"{self.username}@{self.address}:{self.options['error']}",
-                task_results_dir+"/",
+                task_results_dir + "/",
             ],
             check=True,
             capture_output=True,
