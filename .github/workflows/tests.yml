@@ -30,6 +30,7 @@ jobs:
   tests:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: ['ubuntu-latest']
         container:
@@ -43,7 +44,6 @@ jobs:
           - os: macos-latest
             python-version: '3.8'
             experimental: false
-        fail-fast: false
     container: ${{ matrix.container }}
     continue-on-error: ${{ matrix.experimental }}
     outputs:
