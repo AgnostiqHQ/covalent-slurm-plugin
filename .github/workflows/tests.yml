@@ -20,11 +20,11 @@
 
 name: tests
 
-on: 
+on:
   pull_request:
-  push:
-    branches:
-      - develop
+  workflow_run:
+    workflows: [changelog]
+    types: [completed]
 
 jobs:
   tests:
@@ -43,6 +43,7 @@ jobs:
           - os: macos-latest
             python-version: '3.8'
             experimental: false
+        fail-fast: false
     container: ${{ matrix.container }}
     continue-on-error: ${{ matrix.experimental }}
     outputs:
