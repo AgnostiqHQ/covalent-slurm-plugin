@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New logo to reflect revamp in UI.
 
+### Added
+
+- Update workflows to match core covalent CI
+
 ## [0.3.1] -- 2022-05-26
 
 ### Fixed
