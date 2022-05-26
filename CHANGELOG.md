@@ -10,18 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - New logo to reflect revamp in UI.
-
-## [0.3.1] -- 2022-05-26
+- Reverted some changes in slurm.py.
 
 ### Fixed
 
-- Handle exceptions correctly for covalent-mono
+- Handle exceptions correctly
 
-## [0.3.0] -- 2022-05-16
+## [0.2.5] - 2022-05-26
 
-### Changed
+### Fixed
 
-- Reverted slurm.py to work with covalent-mono.
+- Workflows are fixed
 
 ## [0.2.4] - 2022-04-28
 
@@ -34,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The function is deserialized before sending to the remote machine. This allows the remote machine to execute the fuction in a "vanilla" python, and not need Covalent to be installed.
-- The args and kwargs inputs to the function to be executed are pickled into the same file as the function, for transport to the remote machine. 
+- The args and kwargs inputs to the function to be executed are pickled into the same file as the function, for transport to the remote machine.
 
 ## [0.2.2] - 2022-04-14
 
