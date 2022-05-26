@@ -45,34 +45,84 @@ jobs:
             experimental: false
     container: ${{ matrix.container }}
     continue-on-error: ${{ matrix.experimental }}
+    outputs:
+      release: ${{ steps.push.outputs.release }}
     steps:
       - name: Check out head
         uses: actions/checkout@v2
         with:
           persist-credentials: false
+
       - name: Set up Python
         if: matrix.os == 'macos-latest'
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Install Python dependencies
         run: |
           pip install --no-cache-dir -r ./requirements.txt
           pip install --no-cache-dir -r ./tests/requirements.txt
+
       - name: Install Covalent
         run: pip install cova --pre
-      - name: Install Slurm Plugin
-        run: pip install -e .
+
+      - name: Build Slurm plugin
+        run: python setup.py sdist
+
+      - name: Validate plugin
+        run: |
+          VERSION="$(cat ./VERSION)"
+          cd dist
+          tar xzf covalent-slurm-plugin-${VERSION}.tar.gz
+          diff -r covalent-slurm-plugin-${VERSION}/covalent_slurm_plugin/ ../covalent_slurm_plugin/
+          rm -rf covalent-slurm-plugin-${VERSION}/
+          cd ..
+
+      - name: Install Slurm plugin
+        run: |
+          VERSION="$(cat ./VERSION)"
+          pip install ./dist/covalent-slurm-plugin-${VERSION}.tar.gz
+
+      - name: Start Covalent
+        run: covalent start
+
       - name: Test plugin loading
         run: python -c "from covalent.executor import SlurmExecutor"
+
       - name: Run tests
         run: |
-          PYTHONPATH=$PWD/tests pytest tests/slurm_tests.py -vv
+          PYTHONPATH=$PWD/tests pytest -vv tests/
+
+      - name: Get latest release
+        uses: actions-ecosystem/action-get-latest-tag@v1
+        id: get-latest-tag
+        if: github.ref == 'refs/heads/develop' && matrix.os == 'ubuntu-latest' && matrix.container == 'python:3.8-buster'
+        with:
+          semver_only: true
+        
       - name: Push to main
         if: github.ref == 'refs/heads/develop' && matrix.os == 'ubuntu-latest' && matrix.container == 'python:3.8-buster'
         run: |
-          git config user.name "CovalentOpsBot"
-          git config user.email "covalentopsbot@users.noreply.github.com"
-          git remote set-url origin https://${{ secrets.COVALENT_OPS_BOT_TOKEN }}@github.com/AgnostiqHQ/covalent-slurm-plugin.git
-          git fetch --unshallow
-          git push origin HEAD:main
+          MASTER_VERSION="$(echo ${{ steps.get-latest-tag.outputs.tag }} | cut -c2- )"
+          VERSION="$(cat ./VERSION)"
+          release=false
+          if [ "$MASTER_VERSION" = "$VERSION" ] ; then
+            echo "$VERSION has been previously released."
+          else
+            git config user.name "CovalentOpsBot"
+            git config user.email "covalentopsbot@users.noreply.github.com"
+            git remote set-url origin https://${{ secrets.COVALENT_OPS_BOT_TOKEN }}@github.com/AgnostiqHQ/covalent-slurm-plugin.git
+            git fetch --unshallow
+            git push origin HEAD:main
+          fi
+          echo "RELEASE=$release" >> $GITHUB_ENV
+          echo "::set-output name=release::$release"
+         
+  release:
+    needs: tests
+    if: github.ref == 'refs/heads/develop' && needs.tests.outputs.release == 'true'
+    uses: AgnostiqHQ/covalent-slurm-plugin/.github/workflows/release.yml@develop
+    secrets: inherit
+    with:
+      prerelease: true
