@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] -- 2022-05-31
+
+### Added
+
+- Added logging to Slurm executor.
+
 ## [0.3.1] -- 2022-05-19
 
 ### Fixed
@@ -28,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The function is deserialized before sending to the remote machine. This allows the remote machine to execute the fuction in a "vanilla" python, and not need Covalent to be installed.
-- The args and kwargs inputs to the function to be executed are pickled into the same file as the function, for transport to the remote machine. 
+- The args and kwargs inputs to the function to be executed are pickled into the same file as the function, for transport to the remote machine.
 
 ## [0.2.2] - 2022-04-14
 
