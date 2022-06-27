@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+
+- Support `call_before` and `call_after`
+- Added logging to Slurm executor.
+
 ## [0.3.0] - 2022-05-26
 
 ### Changed

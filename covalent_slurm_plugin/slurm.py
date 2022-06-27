@@ -31,12 +31,11 @@ from multiprocessing import Queue as MPQ
 from typing import Any, Dict, List, Union
 
 import cloudpickle as pickle
-
 from covalent._results_manager.result import Result
 from covalent._shared_files import logger
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent._workflow.transport import TransportableObject
-from covalent.executor import BaseExecutor
+from covalent.executor import BaseExecutor, wrapper_fn
 
 app_log = logger.app_log
 log_stack_info = logger.log_stack_info
@@ -93,6 +92,8 @@ class SlurmExecutor(BaseExecutor):
         function: TransportableObject,
         args: List,
         kwargs: Dict,
+        call_before: List,
+        call_after: List,
         dispatch_id: str,
         results_dir: str,
         node_id: int = -1,
@@ -142,48 +143,64 @@ class SlurmExecutor(BaseExecutor):
             dir=self.cache_dir
         ) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as g:
 
-            # Write the deserialized function to file
-            fn = function.get_deserialized()
-            pickle.dump((fn, args, kwargs), f)
+            # Write the wrapper function to file
+
+            new_args = [function, call_before, call_after]
+            for arg in args:
+                new_args.append(arg)
+
+            pickle.dump((wrapper_fn, new_args, kwargs), f)
             f.flush()
 
             # Create the remote directory
-            subprocess.run(
-                [
-                    "ssh",
-                    "-i",
-                    self.ssh_key_file,
-                    "-o",
-                    "StrictHostKeyChecking=no",
-                    "-o",
-                    "UserKnownHostsFile=/dev/null",
-                    "-o",
-                    "LogLevel=ERROR",
-                    f"{self.username}@{self.address}",
-                    "mkdir",
-                    "-p",
-                    self.remote_workdir,
-                ],
-                check=True,
-                capture_output=True,
-            )
+            try:
+                subprocess.run(
+                    [
+                        "ssh",
+                        "-i",
+                        self.ssh_key_file,
+                        "-o",
+                        "StrictHostKeyChecking=no",
+                        "-o",
+                        "UserKnownHostsFile=/dev/null",
+                        "-o",
+                        "LogLevel=ERROR",
+                        f"{self.username}@{self.address}",
+                        "mkdir",
+                        "-p",
+                        self.remote_workdir,
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError as ex:
+                app_log.error(
+                    f"Slurm executor could not create working directory {self.remote_workdir} on {self.username}@{self.address}"
+                )
+                raise ex
 
             # Copy the function to the remote filesystem
             func_filename = f"func-{dispatch_id}-{node_id}.pkl"
             remote_func_filename = os.path.join(self.remote_workdir, func_filename)
 
-            subprocess.run(
-                [
-                    "rsync",
-                    "-e",
-                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
-                    "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
-                    f.name,
-                    f"{self.username}@{self.address}:{remote_func_filename}",
-                ],
-                check=True,
-                capture_output=True,
-            )
+            try:
+                subprocess.run(
+                    [
+                        "rsync",
+                        "-e",
+                        f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                        "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                        f.name,
+                        f"{self.username}@{self.address}:{remote_func_filename}",
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError as ex:
+                app_log.error(
+                    f"Slurm executor could not copy function to {self.username}@{self.address}:{remote_func_filename}"
+                )
+                raise ex
 
             func_py_version = ".".join(function.python_version.split(".")[:2])
 
@@ -202,18 +219,24 @@ class SlurmExecutor(BaseExecutor):
 
             # Copy the script to the remote filesystem
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
-            subprocess.run(
-                [
-                    "rsync",
-                    "-e",
-                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
-                    "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
-                    g.name,
-                    f"{self.username}@{self.address}:{remote_slurm_filename}",
-                ],
-                check=True,
-                capture_output=True,
-            )
+            try:
+                subprocess.run(
+                    [
+                        "rsync",
+                        "-e",
+                        f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                        "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                        g.name,
+                        f"{self.username}@{self.address}:{remote_slurm_filename}",
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError as ex:
+                app_log.error(
+                    f"Slurm executor could not copy slurm script to {self.username}@{self.address}:{remote_slurm_filename}"
+                )
+                raise ex
 
             # Execute the script
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
@@ -239,6 +262,8 @@ class SlurmExecutor(BaseExecutor):
             if proc.returncode == 0:
                 slurm_job_id = int(re.findall("[0-9]+", proc.stdout.decode("utf-8"))[0])
             else:
+                app_log.error(f"Slurm script {remote_slurm_filename} failed.")
+                app_log.error(proc.stderr.decode("utf-8").strip())
                 raise Exception(proc.stderr)
 
             self._poll_slurm(slurm_job_id)
@@ -248,6 +273,9 @@ class SlurmExecutor(BaseExecutor):
             )
 
             if exception:
+                app_log.error(
+                    f"{dispatch_id}: node {node_id} failed to execute on Slurm. Check Slurm log for additional errors."
+                )
                 raise exception
 
             if info_queue:
@@ -403,6 +431,7 @@ wait
             # status = self.get_status(str(job_id))
 
         if "COMPLETED" not in status:
+            app_log.error(f"Job failed with status {status}")
             raise Exception("Job failed with status:\n", status)
 
     def _query_result(self, result_filename: str, task_results_dir: str) -> Any:
@@ -436,6 +465,7 @@ wait
             capture_output=True,
         )
         if proc.returncode != 0:
+            app_log.error(f"Result filename {remote_result_filename} not found.")
             raise FileNotFoundError(proc.returncode, proc.stderr, remote_result_filename)
 
         # Copy result file from backend to Covalent server
