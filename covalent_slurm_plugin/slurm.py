@@ -35,7 +35,7 @@ from covalent._results_manager.result import Result
 from covalent._shared_files import logger
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent._workflow.transport import TransportableObject
-from covalent.executor import BaseExecutor
+from covalent.executor import BaseExecutor, wrapper_fn
 
 app_log = logger.app_log
 log_stack_info = logger.log_stack_info
@@ -92,6 +92,8 @@ class SlurmExecutor(BaseExecutor):
         function: TransportableObject,
         args: List,
         kwargs: Dict,
+        call_before: List,
+        call_after: List,
         dispatch_id: str,
         results_dir: str,
         node_id: int = -1,
@@ -141,9 +143,13 @@ class SlurmExecutor(BaseExecutor):
             dir=self.cache_dir
         ) as f, tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as g:
 
-            # Write the deserialized function to file
-            fn = function.get_deserialized()
-            pickle.dump((fn, args, kwargs), f)
+            # Write the wrapper function to file
+
+            new_args = [function, call_before, call_after]
+            for arg in args:
+                new_args.append(arg)
+
+            pickle.dump((wrapper_fn, new_args, kwargs), f)
             f.flush()
 
             # Create the remote directory
