@@ -20,6 +20,7 @@
 
 """Slurm executor plugin for the Covalent dispatcher."""
 
+import json
 import os
 import re
 import shutil
@@ -119,7 +120,7 @@ class SlurmExecutor(BaseExecutor):
         """
 
         dispatch_info = DispatchInfo(dispatch_id)
-        result_filename = f"result-{dispatch_id}-{node_id}.pkl"
+        result_filename = f"result-{dispatch_id}-{node_id}.json"
         slurm_filename = f"slurm-{dispatch_id}-{node_id}.sh"
         task_results_dir = os.path.join(results_dir, dispatch_id)
 
@@ -344,6 +345,7 @@ fi
         slurm_body = """
 python - <<EOF
 import cloudpickle as pickle
+import json
 
 with open("{func_filename}", "rb") as f:
     function, args, kwargs = pickle.load(f)
@@ -353,11 +355,12 @@ exception = None
 
 try:
     result = function(*args, **kwargs)
+    result_json = result.serialize_to_json()
 except Exception as e:
-    exception = e
+    exception = str(e)
 
-with open("{result_filename}", "wb") as f:
-    pickle.dump((result, exception), f)
+with open("{result_filename}", "w") as f:
+    json.dump((result_json, exception), f)
 EOF
 
 wait
@@ -510,7 +513,12 @@ wait
 
         local_result_filename = os.path.join(task_results_dir, result_filename)
         with open(local_result_filename, "rb") as f:
-            result, exception = pickle.load(f)
+            result_json, exception_string = json.load(f)
+            result = TransportableObject.deserialize_from_json(result_json)
+            if exception_string:
+                exception = RuntimeError(exception_string)
+            else:
+                exception = None
         os.remove(local_result_filename)
 
         stdout_file = os.path.join(task_results_dir, os.path.basename(self.options["output"]))
