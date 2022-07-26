@@ -89,7 +89,7 @@ class SlurmExecutor(BaseAsyncExecutor):
 
     async def run_async_subprocess(self, cmd: List[str]):
 
-        command = " ".join(*cmd)
+        command = " ".join(cmd)
         proc = await asyncio.create_subprocess_shell(
         command,
         stdout=asyncio.subprocess.PIPE,
@@ -360,7 +360,7 @@ wait
         await async_os.remove(stdout_file)
 
         stderr_file = os.path.join(task_results_dir, os.path.basename(self.options["error"]))
-        async with open(stderr_file, "r") as f:
+        async with aiofiles.open(stderr_file, "r") as f:
             stderr = await f.read()
         await async_os.remove(stderr_file)
 
@@ -388,6 +388,7 @@ wait
 
             # Write the deserialized function to file
             await temp_f.write(pickle.dumps((function, args, kwargs)))
+            await temp_f.flush()
 
             # Create the remote directory
             await self.run_async_subprocess(
@@ -432,6 +433,7 @@ wait
                 func_py_version,
             )
             await temp_g.write(slurm_submit_script)
+            await temp_g.flush()
 
             # Copy the script to the remote filesystem
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
