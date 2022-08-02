@@ -66,7 +66,7 @@ jobs:
           pip install --no-cache-dir -r ./tests/requirements.txt
 
       - name: Install Covalent
-        run: pip install cova --pre
+        run: pip install covalent --pre
 
       - name: Build Slurm plugin
         run: python setup.py sdist
