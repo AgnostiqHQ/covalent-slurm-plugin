@@ -105,39 +105,6 @@ class SlurmExecutor(BaseAsyncExecutor):
         
         return proc.returncode, stdout, stderr
 
-    async def execute(
-        self,
-        function: Callable,
-        args: List,
-        kwargs: Dict,
-        dispatch_id: str,
-        results_dir: str,
-        node_id: int = -1,
-    ) -> Any:
-        """
-        Executes the input function and returns the result.
-
-        Args:
-            function: The input python function which will be executed and whose result
-                      is ultimately returned by this function.
-            args: List of positional arguments to be used by the function.
-            kwargs: Dictionary of keyword arguments to be used by the function.
-            info_queue: A multiprocessing Queue object used for shared variables across
-                processes. Information about, eg, status, can be stored here.
-            node_id: The ID of this task in the bigger workflow graph.
-            dispatch_id: The unique identifier of the external lattice process which is
-                         calling this function.
-            results_dir: The location of the results directory.
-
-        Returns:
-            output: The result of the executed function.
-        """
-
-        self.dispatch_id = dispatch_id
-        self.node_id = node_id
-        self.results_dir = results_dir
-        
-        return await super().execute(function, args, kwargs, dispatch_id, results_dir, node_id)
 
     def _format_submit_script(
         self,
@@ -366,19 +333,23 @@ wait
 
         return result, stdout, stderr, exception
 
-    async def run(self, function, args, kwargs):
+    async def run(self, function, args, kwargs, task_metadata):
 
-        result_filename = f"result-{self.dispatch_id}-{self.node_id}.pkl"
-        slurm_filename = f"slurm-{self.dispatch_id}-{self.node_id}.sh"
-        task_results_dir = os.path.join(self.results_dir, self.dispatch_id)
+        dispatch_id = task_metadata["dispatch_id"]
+        node_id = task_metadata["node_id"]
+        results_dir = task_metadata["results_dir"]
+
+        result_filename = f"result-{dispatch_id}-{node_id}.pkl"
+        slurm_filename = f"slurm-{dispatch_id}-{node_id}.sh"
+        task_results_dir = os.path.join(results_dir, dispatch_id)
 
         if "output" not in self.options:
             self.options["output"] = os.path.join(
-                self.remote_workdir, f"stdout-{self.dispatch_id}-{self.node_id}.log"
+                self.remote_workdir, f"stdout-{dispatch_id}-{node_id}.log"
             )
         if "error" not in self.options:
             self.options["error"] = os.path.join(
-                self.remote_workdir, f"stderr-{self.dispatch_id}-{self.node_id}.log"
+                self.remote_workdir, f"stderr-{dispatch_id}-{node_id}.log"
             )
 
         result = None
@@ -410,7 +381,7 @@ wait
             )
 
             # Copy the function to the remote filesystem
-            func_filename = f"func-{self.dispatch_id}-{self.node_id}.pkl"
+            func_filename = f"func-{dispatch_id}-{node_id}.pkl"
             remote_func_filename = os.path.join(self.remote_workdir, func_filename)
 
             await self.run_async_subprocess(
