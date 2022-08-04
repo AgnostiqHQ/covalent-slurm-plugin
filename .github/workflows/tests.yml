@@ -66,7 +66,7 @@ jobs:
           pip install --no-cache-dir -r ./tests/requirements.txt
 
       - name: Install Covalent
-        run: pip install cova --pre
+        run: pip install covalent --pre
 
       - name: Build Slurm plugin
         run: python setup.py sdist
@@ -86,7 +86,7 @@ jobs:
           pip install ./dist/covalent-slurm-plugin-${VERSION}.tar.gz
 
       - name: Start Covalent
-        run: covalent start
+        run: covalent start --ignore-migrations
 
       - name: Test plugin loading
         run: python -c "from covalent.executor import SlurmExecutor"

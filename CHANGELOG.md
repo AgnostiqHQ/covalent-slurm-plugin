@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Slurm executor is now async aware. Internal subprocess calls are now awaited.
+- Tests have been updated to reflect above changes.
+
 ## [0.3.0] - 2022-05-26
 
 ### Changed
