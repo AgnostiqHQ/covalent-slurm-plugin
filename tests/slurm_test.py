@@ -23,12 +23,32 @@
 import os
 import subprocess
 from unittest import mock
+import asyncio
 
+import pytest
 import cloudpickle as pickle
 import covalent as ct
 from covalent._results_manager.result import Result
 from covalent._workflow.transport import TransportableObject
 from covalent.executor import SlurmExecutor
+from covalent.executor.base import wrapper_fn
+from functools import partial
+import aiofiles
+
+
+aiofiles.threadpool.wrap.register(mock.MagicMock)(
+    lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs))
+
+
+class MockAsyncProcess:
+
+    def __init__(self, returncode, stdout, stderr):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+    async def communicate(self):
+        return (self.stdout, self.stderr)
 
 
 def test_init():
@@ -76,22 +96,26 @@ def test_format_submit_script():
     def simple_task(x):
         return x
 
-    transport_function = TransportableObject(simple_task)
-    python_version = ".".join(transport_function.python_version.split(".")[:2])
+    transport_function = partial(wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5))
+    python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
 
     dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
     task_id = 3
     func_filename = f"func-{dispatch_id}-{task_id}.pkl"
     result_filename = f"result-{dispatch_id}-{task_id}.pkl"
 
-    slurm_submit_script = executor._format_submit_script(
-        func_filename,
-        result_filename,
-        python_version,
-    )
+    try:
+        executor._format_submit_script(
+            func_filename,
+            result_filename,
+            python_version,
+        )
+    except Exception as exc:
+        assert False, f"Exception while running _format_submit_script: {exc}"
 
 
-def test_get_status(mocker):
+@pytest.mark.asyncio
+async def test_get_status(mocker):
     """Test the get_status method."""
 
     executor = ct.executor.SlurmExecutor(
@@ -103,24 +127,23 @@ def test_get_status(mocker):
         options={},
     )
 
-    status = executor.get_status({})
+    status = await executor.get_status({})
     assert status == Result.NEW_OBJ
 
+    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(0, "Fake Status".encode("utf-8"), None))
+
     subproc_mock = mocker.patch(
-        "subprocess.run",
-        return_value=subprocess.CompletedProcess(
-            args=[],
-            returncode=0,
-            stdout="Fake Status".encode("utf-8"),
-        ),
+        "asyncio.create_subprocess_shell",
+        side_effect=async_mock,
     )
 
-    status = executor.get_status({"job_id": 0})
+    status = await executor.get_status({"job_id": 0})
     assert status == "Fake Status"
     subproc_mock.assert_called_once()
 
 
-def test_poll_slurm(mocker):
+@pytest.mark.asyncio
+async def test_poll_slurm(mocker):
     """Test that polling the status works."""
 
     executor = ct.executor.SlurmExecutor(
@@ -132,38 +155,36 @@ def test_poll_slurm(mocker):
         options={},
     )
 
+    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(0, "COMPLETED".encode("utf-8"), None))
+
     subproc_mock = mocker.patch(
-        "subprocess.run",
-        return_value=subprocess.CompletedProcess(
-            args=[],
-            returncode=0,
-            stdout="COMPLETED".encode("utf-8"),
-        ),
+        "asyncio.create_subprocess_shell",
+        side_effect=async_mock,
     )
-    executor._poll_slurm(0)
+
+    await executor._poll_slurm(0)
     subproc_mock.assert_called_once()
 
     # Now give an "error" in the get_status method and check that the
     # correct exception is raised.
+
+    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(0, "AN ERROR".encode("utf-8"), None))
     subproc_mock = mocker.patch(
-        "subprocess.run",
-        return_value=subprocess.CompletedProcess(
-            args=[],
-            returncode=0,
-            stdout="AN ERROR".encode("utf-8"),
-        ),
+        "asyncio.create_subprocess_shell",
+        side_effect=async_mock,
     )
 
     try:
-        executor._poll_slurm(0)
-    except Exception as raised_exception:
-        expected_exception = Exception("Job failed with status:\n", "AN ERROR")
+        await executor._poll_slurm(0)
+    except RuntimeError as raised_exception:
+        expected_exception = RuntimeError("Job failed with status:\n", "AN ERROR")
         assert type(raised_exception) == type(expected_exception)
         assert raised_exception.args == expected_exception.args
     subproc_mock.assert_called_once()
 
 
-def test_query_result(mocker):
+@pytest.mark.asyncio
+async def test_query_result(mocker):
     """Test querying results works as expected"""
 
     executor = ct.executor.SlurmExecutor(
@@ -176,39 +197,37 @@ def test_query_result(mocker):
     )
 
     # First test when the remote result file is not found by mocking the return code
-    # of subprocess.run with a non-zero value.
+    # with a non-zero value.
+    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(1, None, None))
     mocker.patch(
-        "subprocess.run",
-        return_value=subprocess.CompletedProcess(
-            args=[],
-            returncode=1,
-        ),
+        "asyncio.create_subprocess_shell",
+        side_effect=async_mock,
     )
 
     try:
-        executor._query_result(result_filename="mock_result", task_results_dir="")
+        await executor._query_result(result_filename="mock_result", task_results_dir="")
     except Exception as raised_exception:
         expected_exception = FileNotFoundError(1, None)
         assert type(raised_exception) == type(expected_exception)
         assert raised_exception.args == expected_exception.args
 
     # Now mock result files.
+    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(0, None, None))
     mocker.patch(
-        "subprocess.run",
-        return_value=subprocess.CompletedProcess(
-            args=[],
-            returncode=0,
-        ),
+        "asyncio.create_subprocess_shell",
+        side_effect=async_mock,
     )
 
     # Don't actually try to remove result files:
-    mocker.patch("os.remove", return_value=None)
+    async_os_remove_mock = mock.AsyncMock(return_value=None)
+    mocker.patch("aiofiles.os.remove", side_effect=async_os_remove_mock)
+
     # Mock the opening of specific result files:
     expected_results = [1, 2, 3, 4, 5]
     expected_error = None
     expected_stdout = "output logs"
     expected_stderr = "output errors"
-    pickle_mock = mocker.patch("cloudpickle.load", return_value=(expected_results, expected_error))
+    pickle_mock = mocker.patch("cloudpickle.loads", return_value=(expected_results, expected_error))
     unpatched_open = open
 
     def mock_open(*args, **kwargs):
@@ -221,9 +240,9 @@ def test_query_result(mocker):
         else:
             return unpatched_open(*args, **kwargs)
 
-    with mock.patch("builtins.open", mock_open):
+    with mock.patch("aiofiles.threadpool.sync_open", mock_open):
 
-        result, stdout, stderr, exception = executor._query_result(
+        result, stdout, stderr, exception = await executor._query_result(
             result_filename="mock_result", task_results_dir=""
         )
 

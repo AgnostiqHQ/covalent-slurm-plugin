@@ -86,7 +86,7 @@ jobs:
           pip install ./dist/covalent-slurm-plugin-${VERSION}.tar.gz
 
       - name: Start Covalent
-        run: covalent start
+        run: covalent start --ignore-migrations
 
       - name: Test plugin loading
         run: python -c "from covalent.executor import SlurmExecutor"
