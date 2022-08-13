@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Updated readme banner
+
+### Fixed
+
+- Fixed test references to conda
+
 ## [0.4.0] - 2022-08-04
 
 ### Changed
