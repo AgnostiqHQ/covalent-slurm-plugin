@@ -20,28 +20,27 @@
 
 """Tests for the SSH executor plugin."""
 
+import asyncio
 import os
 import subprocess
+from functools import partial
 from unittest import mock
-import asyncio
 
-import pytest
+import aiofiles
 import cloudpickle as pickle
 import covalent as ct
+import pytest
 from covalent._results_manager.result import Result
 from covalent._workflow.transport import TransportableObject
 from covalent.executor import SlurmExecutor
 from covalent.executor.base import wrapper_fn
-from functools import partial
-import aiofiles
-
 
 aiofiles.threadpool.wrap.register(mock.MagicMock)(
-    lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs))
+    lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs)
+)
 
 
 class MockAsyncProcess:
-
     def __init__(self, returncode, stdout, stderr):
         self.returncode = returncode
         self.stdout = stdout
@@ -76,8 +75,6 @@ def test_init():
     assert executor.remote_workdir == f"/federation/{remote_username}/.cache/covalent"
     assert executor.poll_freq == 30
     assert executor.options == {}
-    assert executor.conda_env == ""
-    assert executor.current_env_on_conda_fail is False
 
 
 def test_format_submit_script():
@@ -96,7 +93,9 @@ def test_format_submit_script():
     def simple_task(x):
         return x
 
-    transport_function = partial(wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5))
+    transport_function = partial(
+        wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5)
+    )
     python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
 
     dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
@@ -130,7 +129,9 @@ async def test_get_status(mocker):
     status = await executor.get_status({})
     assert status == Result.NEW_OBJ
 
-    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(0, "Fake Status".encode("utf-8"), None))
+    async_mock = mock.AsyncMock(
+        return_value=MockAsyncProcess(0, "Fake Status".encode("utf-8"), None)
+    )
 
     subproc_mock = mocker.patch(
         "asyncio.create_subprocess_shell",
@@ -155,7 +156,9 @@ async def test_poll_slurm(mocker):
         options={},
     )
 
-    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(0, "COMPLETED".encode("utf-8"), None))
+    async_mock = mock.AsyncMock(
+        return_value=MockAsyncProcess(0, "COMPLETED".encode("utf-8"), None)
+    )
 
     subproc_mock = mocker.patch(
         "asyncio.create_subprocess_shell",
@@ -227,7 +230,9 @@ async def test_query_result(mocker):
     expected_error = None
     expected_stdout = "output logs"
     expected_stderr = "output errors"
-    pickle_mock = mocker.patch("cloudpickle.loads", return_value=(expected_results, expected_error))
+    pickle_mock = mocker.patch(
+        "cloudpickle.loads", return_value=(expected_results, expected_error)
+    )
     unpatched_open = open
 
     def mock_open(*args, **kwargs):

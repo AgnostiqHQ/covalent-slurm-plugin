@@ -23,15 +23,14 @@
 import asyncio
 import os
 import re
-import aiofiles
-from aiofiles import os as async_os
 import sys
 import tempfile
 from copy import deepcopy
-from typing import Any, Dict, List, Union, Callable
+from typing import Any, Callable, Dict, List, Union
 
+import aiofiles
 import cloudpickle as pickle
-
+from aiofiles import os as async_os
 from covalent._results_manager.result import Result
 from covalent._shared_files import logger
 from covalent._shared_files.util_classes import DispatchInfo
@@ -91,20 +90,18 @@ class SlurmExecutor(BaseAsyncExecutor):
 
         command = " ".join(cmd)
         proc = await asyncio.create_subprocess_shell(
-        command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE)
+            command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
 
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
 
-        print(f'[{command!r} exited with {proc.returncode}]')
+        print(f"[{command!r} exited with {proc.returncode}]")
         if stdout:
-            print(f'\n{stdout.decode()}')
+            print(f"\n{stdout.decode()}")
         if stderr:
-            print(f'\n{stderr.decode()}', file=sys.stderr)
-        
-        return proc.returncode, stdout, stderr
+            print(f"\n{stderr.decode()}", file=sys.stderr)
 
+        return proc.returncode, stdout, stderr
 
     def _format_submit_script(
         self,
@@ -146,7 +143,7 @@ fi
 """.format(
                 conda_env=self.conda_env
             )
-            if self.conda_env
+            if hasattr(self, "conda_env") and self.conda_env
             else ""
         )
 
@@ -355,7 +352,9 @@ wait
         result = None
         exception = None
 
-        async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
+        async with aiofiles.tempfile.NamedTemporaryFile(
+            dir=self.cache_dir
+        ) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
 
             # Write the deserialized function to file
             await temp_f.write(pickle.dumps((function, args, kwargs)))

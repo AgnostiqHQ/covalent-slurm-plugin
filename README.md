@@ -2,9 +2,7 @@
 
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/AgnostiqHQ/covalent/master/doc/source/_static/covalent_readme_banner.svg" width=150%>
-
-&nbsp;
+<img src="https://raw.githubusercontent.com/AgnostiqHQ/covalent-slurm-plugin/main/assets/slurm_readme_banner.svg" width=150%>
 
 </div>
 
@@ -27,7 +25,6 @@ address = "login.cluster.org"
 ssh_key_file = "/home/user/.ssh/id_rsa"
 remote_workdir = "/scratch/user"
 cache_dir = "/tmp/covalent"
-conda_env = ""
 
 [executors.slurm.options]
 partition = "general"
@@ -63,7 +60,6 @@ or use a class object to customize behavior scoped to specific tasks:
 ```python
 executor = ct.executor.SlurmExecutor(
     remote_workdir="/scratch/user/experiment1",
-    conda_env="covalent",
     options={
         "partition": "compute",
 	"cpus-per-task": 8

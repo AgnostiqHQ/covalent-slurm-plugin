@@ -1,1 +1,2 @@
 aiofiles==0.8.0
+covalent==0.177.0rc0
