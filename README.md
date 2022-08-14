@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/AgnostiqHQ/covalent-slurm-plugin/main/assets/slurm_readme_banner.svg" width=150%>
+<img src="https://raw.githubusercontent.com/AgnostiqHQ/covalent-slurm-plugin/main/assets/slurm_readme_banner.jpg" width=150%>
 
 </div>
 
