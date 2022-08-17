@@ -59,7 +59,7 @@ def test_init():
         "SLURM_SSH_KEY_FILE", os.path.join(os.getenv("HOME", "~/"), ".ssh/id_rsa")
     )
     remote_username = os.getenv("SLURM_USERNAME", "remote_username")
-    cache_dir = os.join(os.getenv("HOME", "~/"), ".cache/covalent")
+    cache_dir = os.path.join(os.getenv("HOME", "~/"), ".cache/covalent")
 
     executor = ct.executor.SlurmExecutor(
         username=username,
