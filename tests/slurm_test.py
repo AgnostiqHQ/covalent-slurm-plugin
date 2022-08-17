@@ -59,6 +59,7 @@ def test_init():
         "SLURM_SSH_KEY_FILE", os.path.join(os.getenv("HOME", "~/"), ".ssh/id_rsa")
     )
     remote_username = os.getenv("SLURM_USERNAME", "remote_username")
+    cache_dir = os.join(os.getenv("HOME", "~/"), ".cache/covalent")
 
     executor = ct.executor.SlurmExecutor(
         username=username,
@@ -66,6 +67,7 @@ def test_init():
         ssh_key_file=key_file,
         remote_workdir=f"/federation/{remote_username}/.cache/covalent",
         poll_freq=30,
+        cache_dir=cache_dir,
         options={},
     )
 
@@ -74,6 +76,7 @@ def test_init():
     assert executor.ssh_key_file == key_file
     assert executor.remote_workdir == f"/federation/{remote_username}/.cache/covalent"
     assert executor.poll_freq == 30
+    assert executor.cache_dir == cache_dir
     assert executor.options == {}
 
 
@@ -87,6 +90,7 @@ def test_format_submit_script():
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
+        cache_dir="~/.cache/covalent",
         options={},
     )
 
@@ -123,6 +127,7 @@ async def test_get_status(mocker):
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
+        cache_dir="~/.cache/covalent",
         options={},
     )
 
@@ -153,6 +158,7 @@ async def test_poll_slurm(mocker):
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
+        cache_dir="~/.cache/covalent",
         options={},
     )
 
@@ -196,6 +202,7 @@ async def test_query_result(mocker):
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
+        cache_dir="~/.cache/covalent",
         options={"output": "stdout_file", "error": "stderr_file"},
     )
 
