@@ -74,6 +74,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         ssh_key_file: str,
         remote_workdir: str,
         poll_freq: int,
+        cache_dir: str,
         options: Dict,
         **kwargs,
     ):
@@ -84,6 +85,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         self.ssh_key_file = ssh_key_file
         self.remote_workdir = remote_workdir
         self.poll_freq = poll_freq
+        self.cache_dir = cache_dir
         self.options = deepcopy(options)
 
     async def run_async_subprocess(self, cmd: List[str]):
