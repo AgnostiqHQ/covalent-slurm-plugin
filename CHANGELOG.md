@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.5.2] - 2022-08-18
+
 ### Fixed
 
 - Restore `cache_dir` parameter to constructor
