@@ -284,8 +284,8 @@ wait
             [
                 "rsync",
                 "-e",
-                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
-                "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                f"'ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR'",
                 f"{self.username}@{self.address}:{remote_result_filename}",
                 f"{task_results_dir}/",
             ],
@@ -296,8 +296,8 @@ wait
             [
                 "rsync",
                 "-e",
-                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
-                "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                f"'ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR'",
                 f"{self.username}@{self.address}:{self.options['output']}",
                 f"{task_results_dir}/",
             ],
@@ -307,8 +307,8 @@ wait
             [
                 "rsync",
                 "-e",
-                f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
-                "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                f"'ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR'",
                 f"{self.username}@{self.address}:{self.options['error']}",
                 f"{task_results_dir}/",
             ],
@@ -389,8 +389,8 @@ wait
                 [
                     "rsync",
                     "-e",
-                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
-                    "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                    f"'ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                    "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR'",
                     temp_f.name,
                     f"{self.username}@{self.address}:{remote_func_filename}",
                 ],
@@ -413,8 +413,8 @@ wait
                 [
                     "rsync",
                     "-e",
-                    f"ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
-                    "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
+                    f"'ssh -i {self.ssh_key_file} -o StrictHostKeyChecking=no "
+                    "-o UserKnownHostsFile=/dev/null -o LogLevel=ERROR'",
                     temp_g.name,
                     f"{self.username}@{self.address}:{remote_slurm_filename}",
                 ],
