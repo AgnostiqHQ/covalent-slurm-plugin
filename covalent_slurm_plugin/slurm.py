@@ -86,7 +86,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         self.username = username
         self.address = address
 
-        ssh_key_file = ssh_key_file or get_config("executors.ssh.ssh_key_file")
+        ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
 
         self.remote_workdir = remote_workdir
@@ -247,7 +247,7 @@ wait
         if job_id is None:
             return Result.NEW_OBJ
         
-        proc = await conn.run(f"scontrol show job {job_id}")
+        proc = await conn.run(f"export PATH=$PATH:/opt/slurm/bin && scontrol show job {job_id}")
         return proc.stdout.strip()
 
     async def _poll_slurm(self, job_id: int, conn: asyncssh.SSHClientConnection) -> None:
@@ -395,7 +395,7 @@ wait
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
             app_log.debug(f"Executing the script: {remote_slurm_filename} ...")
 
-            cmd_sbatch_run = f"sbatch {remote_slurm_filename}"
+            cmd_sbatch_run = f"export PATH=$PATH:/opt/slurm/bin && sbatch {remote_slurm_filename}"
             proc = await conn.run(cmd_sbatch_run)
 
             if proc.returncode == 0:
