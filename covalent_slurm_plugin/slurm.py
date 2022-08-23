@@ -63,9 +63,10 @@ class SlurmExecutor(BaseAsyncExecutor):
         address: Remote address or hostname of the Slurm login node.
         ssh_key_file: Private RSA key used to authenticate over SSH.
         remote_workdir: Working directory on the remote cluster.
+        slurm_path: Path to the slurm commands if they are not found automatically.
+        cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
         poll_freq: Frequency with which to poll a submitted job.
-        cache_dir: Cache directory used by this executor for temporary files.
         do_cleanup: Whether to perform cleanup or not on remote machine.
     """
 
@@ -75,9 +76,10 @@ class SlurmExecutor(BaseAsyncExecutor):
         address: str,
         ssh_key_file: str,
         remote_workdir: str,
+        slurm_path: str = "",
+        cache_dir: str = None,
         options: Dict = None,
         poll_freq: int = 30,
-        cache_dir: str = None,
         do_cleanup: bool = True,
         **kwargs,
     ):
@@ -90,10 +92,11 @@ class SlurmExecutor(BaseAsyncExecutor):
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
 
         self.remote_workdir = remote_workdir
+        self.slurm_path = slurm_path
         self.poll_freq = poll_freq
 
-        self.cache_dir = cache_dir or get_config("dispatcher.cache_dir")
-        self.cache_dir = str(Path(self.cache_dir).expanduser().resolve())
+        cache_dir = cache_dir or get_config("dispatcher.cache_dir")
+        self.cache_dir = str(Path(cache_dir).expanduser().resolve())
 
         # To allow passing empty dictionary
         if options is None:
@@ -257,7 +260,13 @@ wait
         if job_id is None:
             return Result.NEW_OBJ
         
-        proc = await conn.run(f"export PATH=$PATH:/opt/slurm/bin && scontrol show job {job_id}")
+        cmd_scontrol = f"scontrol show job {job_id}"
+        
+        verify_scontrol = await conn.run("which scontrol")
+        if verify_scontrol.returncode != 0:
+            cmd_scontrol = f"export PATH=$PATH:{self.slurm_path} && {cmd_scontrol}"
+
+        proc = await conn.run(cmd_scontrol)
         return proc.stdout.strip()
 
     async def _poll_slurm(self, job_id: int, conn: asyncssh.SSHClientConnection) -> None:
@@ -403,8 +412,13 @@ wait
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
 
             app_log.debug(f"Running the script: {remote_slurm_filename} ...")
-            cmd_sbatch_run = f"export PATH=$PATH:/opt/slurm/bin && sbatch {remote_slurm_filename}"
-            proc = await conn.run(cmd_sbatch_run)
+            cmd_sbatch = f"sbatch {remote_slurm_filename}"
+            
+            verify_sbatch = await conn.run("which sbatch")
+            if verify_sbatch.returncode != 0:
+                cmd_sbatch = f"export PATH=$PATH:{self.slurm_path} && {cmd_sbatch}"
+
+            proc = await conn.run(cmd_sbatch)
 
             if proc.returncode != 0:
                 raise RuntimeError(proc.stderr.strip())

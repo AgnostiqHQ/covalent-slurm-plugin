@@ -30,7 +30,7 @@ from covalent._results_manager.result import Result
 from covalent._workflow.transport import TransportableObject
 from covalent.executor.base import wrapper_fn
 from covalent_slurm_plugin import SlurmExecutor
-import asyncssh
+from pathlib import Path
 
 aiofiles.threadpool.wrap.register(mock.MagicMock)(
     lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs)
@@ -47,19 +47,19 @@ def conn_mock():
 def test_init():
     """Test that initialization properly sets member variables."""
 
-    username = os.getenv("SLURM_USERNAME", "username")
-    host = os.getenv("SLURM_CLUSTER_ADDR", "host")
-    key_file = os.getenv(
-        "SLURM_SSH_KEY_FILE", os.path.join(os.getenv("HOME", "~/"), ".ssh/id_rsa")
-    )
-    remote_username = os.getenv("SLURM_USERNAME", "remote_username")
-    cache_dir = os.path.join(os.getenv("HOME", "~/"), ".cache/covalent")
+    username = "username"
+    host = "host"
+    key_file = "key_file"
+    remote_workdir = "/test/remote/workdir"
+    slurm_path = "/opt/test/slurm/path"
+    cache_dir = "/test/cache/dir"
 
     executor = SlurmExecutor(
         username=username,
         address=host,
         ssh_key_file=key_file,
-        remote_workdir=f"/federation/{remote_username}/.cache/covalent",
+        remote_workdir=remote_workdir,
+        slurm_path=slurm_path,
         poll_freq=30,
         cache_dir=cache_dir,
         options={},
@@ -67,8 +67,9 @@ def test_init():
 
     assert executor.username == username
     assert executor.address == host
-    assert executor.ssh_key_file == key_file
-    assert executor.remote_workdir == f"/federation/{remote_username}/.cache/covalent"
+    assert executor.ssh_key_file == str(Path(key_file).expanduser().resolve())
+    assert executor.remote_workdir == remote_workdir
+    assert executor.slurm_path == slurm_path
     assert executor.poll_freq == 30
     assert executor.cache_dir == cache_dir
     assert executor.options == {}
@@ -136,7 +137,7 @@ async def test_get_status(proc_mock, conn_mock):
 
     status = await executor.get_status({"job_id": 0}, conn_mock)
     assert status == "Fake Status"
-    conn_mock.run.assert_called_once()
+    assert conn_mock.run.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -161,7 +162,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
 
     # Check completed status does not give any errors
     await executor._poll_slurm(0, conn_mock)
-    conn_mock.run.assert_called_once()
+    assert conn_mock.run.call_count == 2
 
     # Now give an "error" in the get_status method and check that the
     # correct exception is raised.
@@ -176,7 +177,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
         assert type(raised_exception) == type(expected_exception)
         assert raised_exception.args == expected_exception.args
     
-    conn_mock.run.assert_called_once()
+    assert conn_mock.run.call_count == 2
 
 
 @pytest.mark.asyncio
