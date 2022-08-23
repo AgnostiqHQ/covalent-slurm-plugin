@@ -99,25 +99,6 @@ class SlurmExecutor(BaseAsyncExecutor):
 
         self.do_cleanup = do_cleanup
 
-    # async def run_async_subprocess(self, cmd: List[str]):
-
-    #     command = " ".join(cmd)
-    #     app_log.debug(f"Command running: {command}")
-
-    #     proc = await asyncio.create_subprocess_shell(
-    #         command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-    #     )
-
-    #     stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
-
-    #     print(f"[{command!r} exited with {proc.returncode}]")
-    #     if stdout:
-    #         print(f"\n{stdout.decode()}")
-    #     if stderr:
-    #         print(f"\n{stderr.decode()}", file=sys.stderr)
-
-    #     return proc.returncode, stdout, stderr
-
     async def _client_connect(self) -> Tuple[bool, asyncssh.SSHClientConnection]:
         """
         Helper function for connecting to the remote host through the paramiko module.
@@ -291,7 +272,7 @@ wait
 
         proc = await conn.run(f"test -e {remote_result_filename}")
         if proc.returncode != 0:
-            raise FileNotFoundError(proc.returncode, proc.stderr, remote_result_filename)
+            raise FileNotFoundError(proc.returncode, proc.stderr.strip(), remote_result_filename)
 
         # Copy result file from remote machine to Covalent server
         local_result_filename = os.path.join(task_results_dir, result_filename)
@@ -349,8 +330,8 @@ wait
             raise RuntimeError(f"Could not connect to host: '{self.address}' as user: '{self.username}'")
 
         async with aiofiles.tempfile.NamedTemporaryFile(
-                dir=self.cache_dir
-            ) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
+                    dir=self.cache_dir
+                ) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
 
             # Write the function to file
             app_log.debug("Writing function, args, kwargs to file...")
@@ -361,9 +342,9 @@ wait
             app_log.debug(f"Creating remote work directory {self.remote_workdir} ...")
             cmd_mkdir_remote = f"mkdir -p {self.remote_workdir}"
 
-            mkdir_cache = await conn.run(cmd_mkdir_remote)
-            if client_err := mkdir_cache.stderr:
-                app_log.warning(client_err)
+            proc_mkdir_cache = await conn.run(cmd_mkdir_remote)
+            if client_err := proc_mkdir_cache.stderr.strip():
+                raise RuntimeError(client_err)
 
             # Copy the function to the remote filesystem
             func_filename = f"func-{dispatch_id}-{node_id}.pkl"
@@ -388,20 +369,22 @@ wait
 
             # Copy the script to the remote filesystem
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
+
             app_log.debug(f"Copying slurm submit script to remote: {remote_slurm_filename} ...")
             await asyncssh.scp(temp_g.name, (conn, remote_slurm_filename))
 
             # Execute the script
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
-            app_log.debug(f"Executing the script: {remote_slurm_filename} ...")
 
+            app_log.debug(f"Running the script: {remote_slurm_filename} ...")
             cmd_sbatch_run = f"export PATH=$PATH:/opt/slurm/bin && sbatch {remote_slurm_filename}"
             proc = await conn.run(cmd_sbatch_run)
 
-            if proc.returncode == 0:
-                slurm_job_id = int(re.findall("[0-9]+", proc.stdout))
-            else:
-                raise RuntimeError(proc.stderr)
+            if proc.returncode != 0:
+                raise RuntimeError(proc.stderr.strip())
+
+            app_log.debug(f"Job submitted with stdout: {proc.stdout.strip()}")
+            slurm_job_id = int(re.findall("[0-9]+", proc.stdout.strip())[0])
 
             app_log.debug(f"Polling slurm with job_id: {slurm_job_id} ...")
             await self._poll_slurm(slurm_job_id, conn)
@@ -414,7 +397,7 @@ wait
 
             print(stdout)
             print(stderr, file=sys.stderr)
-            
+
             app_log.debug("Closing SSH connection...")
             conn.close()
             await conn.wait_closed()
