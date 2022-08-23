@@ -91,6 +91,8 @@ class SlurmExecutor(BaseAsyncExecutor):
     async def run_async_subprocess(self, cmd: List[str]):
 
         command = " ".join(cmd)
+        app_log.debug(f"Command running: {command}")
+
         proc = await asyncio.create_subprocess_shell(
             command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
@@ -217,7 +219,7 @@ wait
                 "/bin/bash",
                 "-l",
                 "-c",
-                f'"scontrol show job {job_id}"',
+                f"'scontrol show job {job_id}'",
             ],
         )
         return proc_stdout.decode("utf-8").strip()
@@ -355,14 +357,16 @@ wait
         exception = None
 
         async with aiofiles.tempfile.NamedTemporaryFile(
-            dir=self.cache_dir
-        ) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
+                dir=self.cache_dir
+            ) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
 
-            # Write the deserialized function to file
+            # Write the function to file
+            app_log.debug("Writing function, args, kwargs to file...")
             await temp_f.write(pickle.dumps((function, args, kwargs)))
             await temp_f.flush()
 
             # Create the remote directory
+            app_log.debug(f"Creating remote work directory {self.remote_workdir} ...")
             await self.run_async_subprocess(
                 [
                     "ssh",
@@ -385,6 +389,7 @@ wait
             func_filename = f"func-{dispatch_id}-{node_id}.pkl"
             remote_func_filename = os.path.join(self.remote_workdir, func_filename)
 
+            app_log.debug(f"Copying function to remote fs: {remote_func_filename} ...")
             await self.run_async_subprocess(
                 [
                     "rsync",
@@ -397,6 +402,7 @@ wait
             )
 
             func_py_version = ".".join(function.args[0].python_version.split(".")[:2])
+            app_log.debug(f"Python version: {func_py_version}")
 
             # Format the SLURM submit script
             slurm_submit_script = self._format_submit_script(
@@ -404,11 +410,14 @@ wait
                 result_filename,
                 func_py_version,
             )
+
+            app_log.debug("Writing slurm submit script to file...")
             await temp_g.write(slurm_submit_script)
             await temp_g.flush()
 
             # Copy the script to the remote filesystem
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
+            app_log.debug(f"Copying slurm submit script to remote: {remote_slurm_filename} ...")
             await self.run_async_subprocess(
                 [
                     "rsync",
@@ -422,6 +431,7 @@ wait
 
             # Execute the script
             remote_slurm_filename = os.path.join(self.remote_workdir, slurm_filename)
+            app_log.debug(f"Executing the script: {remote_slurm_filename} ...")
             return_code, proc_stdout, proc_stderr = await self.run_async_subprocess(
                 [
                     "ssh",
@@ -437,7 +447,7 @@ wait
                     "/bin/bash",
                     "-l",
                     "-c",
-                    f'"sbatch {remote_slurm_filename}"',
+                    f"'sbatch {remote_slurm_filename}'",
                 ],
             )
             if return_code == 0:
@@ -445,8 +455,10 @@ wait
             else:
                 raise RuntimeError(proc_stderr)
 
+            app_log.debug(f"Polling slurm with job_id: {slurm_job_id} ...")
             await self._poll_slurm(slurm_job_id)
 
+            app_log.debug(f"Querying result with job_id: {slurm_job_id} ...")
             result, stdout, stderr, exception = await self._query_result(
                 result_filename, task_results_dir
             )
@@ -454,6 +466,11 @@ wait
             if exception:
                 raise exception
 
+            print(stdout)
+            print(stderr, file=sys.stderr)
+
+            app_log.debug(f"Execution finished...")
+
             # FIX: covalent-mono's _run_task should parse exceptions from executor.execute()
             # return result, stdout, stderr, exception
-            return result, stdout, stderr
+            return result
