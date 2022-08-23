@@ -441,10 +441,15 @@ wait
                 raise RuntimeError(exception)
             
             app_log.debug("Preparing for teardown...")
-            self._conn = conn
             self._remote_func_filename = remote_func_filename
             self._remote_slurm_filename = remote_slurm_filename
             self._result_filename = result_filename
+
+
+            app_log.debug("Closing SSH connection...")
+            conn.close()
+            await conn.wait_closed()
+            app_log.debug("SSH connection closed, returning result")
 
             return result
 
@@ -452,8 +457,9 @@ wait
 
         if self.cleanup:
             app_log.debug("Performing cleanup on remote...")
+            _, conn = await self._client_connect()
             await self.perform_cleanup(
-                conn=self._conn,
+                conn=conn,
                 remote_func_filename=self._remote_func_filename,
                 remote_slurm_filename=self._remote_slurm_filename,
                 remote_result_filename=os.path.join(self.remote_workdir, self._result_filename),
@@ -462,6 +468,6 @@ wait
             )
 
         app_log.debug("Closing SSH connection...")
-        self._conn.close()
-        await self._conn.wait_closed()
+        conn.close()
+        await conn.wait_closed()
         app_log.debug("SSH connection closed, teardown complete")
