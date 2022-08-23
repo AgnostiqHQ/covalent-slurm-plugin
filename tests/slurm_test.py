@@ -20,52 +20,46 @@
 
 """Tests for the SSH executor plugin."""
 
-import asyncio
 import os
-import subprocess
 from functools import partial
 from unittest import mock
 
 import aiofiles
-import cloudpickle as pickle
-import covalent as ct
 import pytest
 from covalent._results_manager.result import Result
 from covalent._workflow.transport import TransportableObject
-from covalent.executor import SlurmExecutor
 from covalent.executor.base import wrapper_fn
+from covalent_slurm_plugin import SlurmExecutor
+from pathlib import Path
 
 aiofiles.threadpool.wrap.register(mock.MagicMock)(
     lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs)
 )
 
+@pytest.fixture
+def proc_mock():
+    return mock.Mock()
 
-class MockAsyncProcess:
-    def __init__(self, returncode, stdout, stderr):
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
-
-    async def communicate(self):
-        return (self.stdout, self.stderr)
-
+@pytest.fixture
+def conn_mock():
+    return mock.Mock()
 
 def test_init():
     """Test that initialization properly sets member variables."""
 
-    username = os.getenv("SLURM_USERNAME", "username")
-    host = os.getenv("SLURM_CLUSTER_ADDR", "host")
-    key_file = os.getenv(
-        "SLURM_SSH_KEY_FILE", os.path.join(os.getenv("HOME", "~/"), ".ssh/id_rsa")
-    )
-    remote_username = os.getenv("SLURM_USERNAME", "remote_username")
-    cache_dir = os.path.join(os.getenv("HOME", "~/"), ".cache/covalent")
+    username = "username"
+    host = "host"
+    key_file = "key_file"
+    remote_workdir = "/test/remote/workdir"
+    slurm_path = "/opt/test/slurm/path"
+    cache_dir = "/test/cache/dir"
 
-    executor = ct.executor.SlurmExecutor(
+    executor = SlurmExecutor(
         username=username,
         address=host,
         ssh_key_file=key_file,
-        remote_workdir=f"/federation/{remote_username}/.cache/covalent",
+        remote_workdir=remote_workdir,
+        slurm_path=slurm_path,
         poll_freq=30,
         cache_dir=cache_dir,
         options={},
@@ -73,8 +67,9 @@ def test_init():
 
     assert executor.username == username
     assert executor.address == host
-    assert executor.ssh_key_file == key_file
-    assert executor.remote_workdir == f"/federation/{remote_username}/.cache/covalent"
+    assert executor.ssh_key_file == str(Path(key_file).expanduser().resolve())
+    assert executor.remote_workdir == remote_workdir
+    assert executor.slurm_path == slurm_path
     assert executor.poll_freq == 30
     assert executor.cache_dir == cache_dir
     assert executor.options == {}
@@ -84,7 +79,7 @@ def test_format_submit_script():
     """Test that the script (in string form) which is to be run on the remote server is
     created with no errors."""
 
-    executor = ct.executor.SlurmExecutor(
+    executor = SlurmExecutor(
         username="test_user",
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
@@ -118,10 +113,10 @@ def test_format_submit_script():
 
 
 @pytest.mark.asyncio
-async def test_get_status(mocker):
+async def test_get_status(proc_mock, conn_mock):
     """Test the get_status method."""
 
-    executor = ct.executor.SlurmExecutor(
+    executor = SlurmExecutor(
         username="test_user",
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
@@ -131,28 +126,25 @@ async def test_get_status(mocker):
         options={},
     )
 
-    status = await executor.get_status({})
+    proc_mock.returncode = 0
+    proc_mock.stdout = "Fake Status"
+    proc_mock.stderr = "stderr"
+
+    conn_mock.run = mock.AsyncMock(return_value=proc_mock)
+
+    status = await executor.get_status({}, conn_mock)
     assert status == Result.NEW_OBJ
 
-    async_mock = mock.AsyncMock(
-        return_value=MockAsyncProcess(0, "Fake Status".encode("utf-8"), None)
-    )
-
-    subproc_mock = mocker.patch(
-        "asyncio.create_subprocess_shell",
-        side_effect=async_mock,
-    )
-
-    status = await executor.get_status({"job_id": 0})
+    status = await executor.get_status({"job_id": 0}, conn_mock)
     assert status == "Fake Status"
-    subproc_mock.assert_called_once()
+    assert conn_mock.run.call_count == 2
 
 
 @pytest.mark.asyncio
-async def test_poll_slurm(mocker):
+async def test_poll_slurm(proc_mock, conn_mock):
     """Test that polling the status works."""
 
-    executor = ct.executor.SlurmExecutor(
+    executor = SlurmExecutor(
         username="test_user",
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
@@ -160,43 +152,40 @@ async def test_poll_slurm(mocker):
         poll_freq=30,
         cache_dir="~/.cache/covalent",
         options={},
+        slurm_path="sample_path",
     )
 
-    async_mock = mock.AsyncMock(
-        return_value=MockAsyncProcess(0, "COMPLETED".encode("utf-8"), None)
-    )
+    proc_mock.returncode = 0
+    proc_mock.stdout = "COMPLETED"
+    proc_mock.stderr = "stderr"
 
-    subproc_mock = mocker.patch(
-        "asyncio.create_subprocess_shell",
-        side_effect=async_mock,
-    )
+    conn_mock.run = mock.AsyncMock(return_value=proc_mock)
 
-    await executor._poll_slurm(0)
-    subproc_mock.assert_called_once()
+    # Check completed status does not give any errors
+    await executor._poll_slurm(0, conn_mock)
+    conn_mock.run.assert_called_once()
 
     # Now give an "error" in the get_status method and check that the
     # correct exception is raised.
-
-    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(0, "AN ERROR".encode("utf-8"), None))
-    subproc_mock = mocker.patch(
-        "asyncio.create_subprocess_shell",
-        side_effect=async_mock,
-    )
+    proc_mock.returncode = 1
+    proc_mock.stdout = "AN ERROR"
+    conn_mock.run = mock.AsyncMock(return_value=proc_mock)
 
     try:
-        await executor._poll_slurm(0)
+        await executor._poll_slurm(0, conn_mock)
     except RuntimeError as raised_exception:
         expected_exception = RuntimeError("Job failed with status:\n", "AN ERROR")
         assert type(raised_exception) == type(expected_exception)
         assert raised_exception.args == expected_exception.args
-    subproc_mock.assert_called_once()
+    
+    conn_mock.run.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_query_result(mocker):
+async def test_query_result(mocker, proc_mock, conn_mock):
     """Test querying results works as expected"""
 
-    executor = ct.executor.SlurmExecutor(
+    executor = SlurmExecutor(
         username="test_user",
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
@@ -208,25 +197,24 @@ async def test_query_result(mocker):
 
     # First test when the remote result file is not found by mocking the return code
     # with a non-zero value.
-    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(1, None, None))
-    mocker.patch(
-        "asyncio.create_subprocess_shell",
-        side_effect=async_mock,
-    )
+    proc_mock.returncode = 1
+    proc_mock.stdout = "stdout"
+    proc_mock.stderr = "stderr"
+
+    conn_mock.run = mock.AsyncMock(return_value=proc_mock)
 
     try:
-        await executor._query_result(result_filename="mock_result", task_results_dir="")
+        await executor._query_result(result_filename="mock_result", task_results_dir="", conn=conn_mock)
     except Exception as raised_exception:
-        expected_exception = FileNotFoundError(1, None)
+        expected_exception = FileNotFoundError(1, "stderr")
         assert type(raised_exception) == type(expected_exception)
         assert raised_exception.args == expected_exception.args
 
     # Now mock result files.
-    async_mock = mock.AsyncMock(return_value=MockAsyncProcess(0, None, None))
-    mocker.patch(
-        "asyncio.create_subprocess_shell",
-        side_effect=async_mock,
-    )
+    proc_mock.returncode = 0
+    conn_mock.run = mock.AsyncMock(return_value=proc_mock)
+
+    mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
 
     # Don't actually try to remove result files:
     async_os_remove_mock = mock.AsyncMock(return_value=None)
@@ -255,7 +243,7 @@ async def test_query_result(mocker):
     with mock.patch("aiofiles.threadpool.sync_open", mock_open):
 
         result, stdout, stderr, exception = await executor._query_result(
-            result_filename="mock_result", task_results_dir=""
+            result_filename="mock_result", task_results_dir="", conn=conn_mock
         )
 
         assert result == expected_results

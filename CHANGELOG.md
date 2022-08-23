@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+
+- `SlurmExecutor` can now be import directly from `covalent_slurm_plugin`
+- Added several debug log statements to track progress when debugging
+- `asyncssh` added as a requirement
+- Added support for performing cleanup on remote machine (default is True) once execution completes
+- Added `slurm_path` for users to provide a path for slurm commands if they aren't detected automatically
+
+### Changed
+
+- Default values set for some `SlurmExecutor` initialization parameters
+- Since there were several ssh calls, thus now using `asyncssh` module for a uniform interface to run ssh commands on remote machine
+- File transfer to and from is now done using `scp` instead of `rsync`
+
+### Fixed
+
+- Fixed returning only `result` from `run` method instead of returning `stdout` and `stderr` as well, which are now printed directly appropriately
+
+### Tests
+
+- Updated tests to reflect above changes
+
 ## [0.6.0] - 2022-08-18
 
 ### Changed
