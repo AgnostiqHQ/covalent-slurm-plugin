@@ -67,7 +67,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
         poll_freq: Frequency with which to poll a submitted job.
-        do_cleanup: Whether to perform cleanup or not on remote machine.
+        cleanup: Whether to perform cleanup or not on remote machine.
     """
 
     def __init__(
@@ -80,7 +80,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         cache_dir: str = None,
         options: Dict = None,
         poll_freq: int = 30,
-        do_cleanup: bool = True,
+        cleanup: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -103,7 +103,7 @@ class SlurmExecutor(BaseAsyncExecutor):
             options = get_config("executors.slurm.options")
         self.options = deepcopy(options)
 
-        self.do_cleanup = do_cleanup
+        self.cleanup = cleanup
 
     async def _client_connect(self) -> Tuple[bool, asyncssh.SSHClientConnection]:
         """
@@ -134,7 +134,7 @@ class SlurmExecutor(BaseAsyncExecutor):
 
         return ssh_success, conn
 
-    async def _cleanup(
+    async def perform_cleanup(
         self,
         conn: asyncssh.SSHClientConnection,
         remote_func_filename: str,
@@ -440,20 +440,28 @@ wait
             if exception:
                 raise RuntimeError(exception)
             
-            if self.do_cleanup:
-                app_log.debug("Performing cleanup on remote...")
-                await self._cleanup(
-                    conn=conn,
-                    remote_func_filename=remote_func_filename,
-                    remote_slurm_filename=remote_slurm_filename,
-                    remote_result_filename=os.path.join(self.remote_workdir, result_filename),
-                    remote_stdout_filename=self.options['output'],
-                    remote_stderr_filename=self.options['error'],
-                )
-
-            app_log.debug("Closing SSH connection...")
-            conn.close()
-            await conn.wait_closed()
-            app_log.debug("SSH connection closed, execution finished returning result...")
+            app_log.debug("Preparing for teardown...")
+            self._conn = conn
+            self._remote_func_filename = remote_func_filename
+            self._remote_slurm_filename = remote_slurm_filename
+            self._result_filename = result_filename
 
             return result
+
+    async def teardown(self, task_metadata: Dict):
+
+        if self.cleanup:
+            app_log.debug("Performing cleanup on remote...")
+            await self.perform_cleanup(
+                conn=self._conn,
+                remote_func_filename=self._remote_func_filename,
+                remote_slurm_filename=self._remote_slurm_filename,
+                remote_result_filename=os.path.join(self.remote_workdir, self._result_filename),
+                remote_stdout_filename=self.options['output'],
+                remote_stderr_filename=self.options['error'],
+            )
+
+        app_log.debug("Closing SSH connection...")
+        self._conn.close()
+        await self._conn.wait_closed()
+        app_log.debug("SSH connection closed, teardown complete")
