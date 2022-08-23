@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SlurmExecutor` can now be import directly from `covalent_slurm_plugin`
 - Added several debug log statements to track progress when debugging
 - `asyncssh` added as a requirement
+- Added support for performing cleanup on remote machine (default is True) once execution completes
 
 ### Changed
 

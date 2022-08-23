@@ -63,9 +63,10 @@ class SlurmExecutor(BaseAsyncExecutor):
         address: Remote address or hostname of the Slurm login node.
         ssh_key_file: Private RSA key used to authenticate over SSH.
         remote_workdir: Working directory on the remote cluster.
+        options: Dictionary of parameters used to build a Slurm submit script.
         poll_freq: Frequency with which to poll a submitted job.
         cache_dir: Cache directory used by this executor for temporary files.
-        options: Dictionary of parameters used to build a Slurm submit script.
+        do_cleanup: Whether to perform cleanup or not on remote machine.
     """
 
     def __init__(
@@ -77,7 +78,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         options: Dict,
         poll_freq: int = 30,
         cache_dir: str = str(Path("~/.cache/covalent").expanduser().resolve()),
-        do_cleanup: bool = False,
+        do_cleanup: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -126,6 +127,35 @@ class SlurmExecutor(BaseAsyncExecutor):
             raise RuntimeError(message)
 
         return ssh_success, conn
+
+    async def _cleanup(
+        self,
+        conn: asyncssh.SSHClientConnection,
+        remote_func_filename: str,
+        remote_slurm_filename: str,
+        remote_result_filename: str,
+        remote_stdout_filename: str,
+        remote_stderr_filename: str
+    ) -> None:
+        """
+        Function to perform cleanup on remote machine
+
+        Args:
+            remote_func_filename: Function file on remote machine
+            remote_slurm_filename: Slurm script file on remote machine
+            remote_result_filename: Result file on remote machine
+            remote_stdout_filename: Standard out file on remote machine
+            remote_stderr_filename: Standard error file on remote machine
+        
+        Returns:
+            None
+        """
+
+        await conn.run(f"rm {remote_func_filename}")
+        await conn.run(f"rm {remote_slurm_filename}")
+        await conn.run(f"rm {remote_result_filename}")
+        await conn.run(f"rm {remote_stdout_filename}")
+        await conn.run(f"rm {remote_stderr_filename}")
 
     def _format_submit_script(
         self,
@@ -392,6 +422,17 @@ wait
 
             if exception:
                 raise RuntimeError(exception)
+            
+            if self.do_cleanup:
+                app_log.debug("Performing cleanup on remote...")
+                await self._cleanup(
+                    conn=conn,
+                    remote_func_filename=remote_func_filename,
+                    remote_slurm_filename=remote_slurm_filename,
+                    remote_result_filename=os.path.join(self.remote_workdir, result_filename),
+                    remote_stdout_filename=self.options['output'],
+                    remote_stderr_filename=self.options['error'],
+                )
 
             app_log.debug("Closing SSH connection...")
             conn.close()
