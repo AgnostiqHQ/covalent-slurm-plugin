@@ -298,10 +298,7 @@ wait
             stderr = await f.read()
         await async_os.remove(stderr_file)
 
-        if exception:
-            raise RuntimeError(exception)
-
-        return result, stdout, stderr
+        return result, stdout, stderr, exception
 
     async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
 
@@ -390,13 +387,15 @@ wait
             await self._poll_slurm(slurm_job_id, conn)
 
             app_log.debug(f"Querying result with job_id: {slurm_job_id} ...")
-            result, stdout, stderr = await self._query_result(
+            result, stdout, stderr, exception = await self._query_result(
                 result_filename, task_results_dir, conn
             )
 
-
             print(stdout)
             print(stderr, file=sys.stderr)
+
+            if exception:
+                raise RuntimeError(exception)
 
             app_log.debug("Closing SSH connection...")
             conn.close()
