@@ -33,7 +33,7 @@ import cloudpickle as pickle
 from aiofiles import os as async_os
 from covalent._results_manager.result import Result
 from covalent._shared_files import logger
-from covalent._shared_files.util_classes import DispatchInfo
+from pathlib import Path
 from covalent.executor.base import BaseAsyncExecutor
 
 app_log = logger.app_log
@@ -45,7 +45,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "ssh_key_file": "",
     "remote_workdir": "",
     "poll_freq": 30,
-    "cache_dir": "/tmp/covalent",
+    "cache_dir": str(Path("~/.cache/covalent").expanduser().resolve()),
     "options": {
         "parsable": "",
     },
@@ -74,8 +74,8 @@ class SlurmExecutor(BaseAsyncExecutor):
         ssh_key_file: str,
         remote_workdir: str,
         poll_freq: int,
-        cache_dir: str,
         options: Dict,
+        cache_dir: str = str(Path("~/.cache/covalent").expanduser().resolve()),
         **kwargs,
     ):
         super().__init__(**kwargs)
