@@ -36,7 +36,6 @@ from pathlib import Path
 from covalent.executor.base import BaseAsyncExecutor
 from covalent._shared_files.config import get_config
 import asyncssh
-import socket
 
 app_log = logger.app_log
 log_stack_info = logger.log_stack_info
@@ -101,7 +100,7 @@ class SlurmExecutor(BaseAsyncExecutor):
 
     async def _client_connect(self) -> Tuple[bool, asyncssh.SSHClientConnection]:
         """
-        Helper function for connecting to the remote host through the paramiko module.
+        Helper function for connecting to the remote host through asyncssh module.
 
         Args:
             None
@@ -113,21 +112,18 @@ class SlurmExecutor(BaseAsyncExecutor):
         ssh_success = False
         conn = None
         if os.path.exists(self.ssh_key_file):
-            try:
-                conn = await asyncssh.connect(
-                    self.address,
-                    username=self.username,
-                    client_keys=[self.ssh_key_file],
-                    known_hosts=None,
-                )
+            conn = await asyncssh.connect(
+                self.address,
+                username=self.username,
+                client_keys=[self.ssh_key_file],
+                known_hosts=None,
+            )
 
-                ssh_success = True
-            except (socket.gaierror, ValueError, TimeoutError) as e:
-                app_log.error(e)
+            ssh_success = True
 
         else:
-            message = f"no SSH key file found at {self.ssh_key_file}. Cannot connect to host."
-            app_log.error(message)
+            message = f"No SSH key file found at {self.ssh_key_file}. Cannot connect to host."
+            raise RuntimeError(message)
 
         return ssh_success, conn
 
