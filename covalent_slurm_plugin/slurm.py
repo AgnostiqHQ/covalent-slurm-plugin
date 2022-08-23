@@ -95,7 +95,9 @@ class SlurmExecutor(BaseAsyncExecutor):
         self.cache_dir = cache_dir or get_config("dispatcher.cache_dir")
         self.cache_dir = str(Path(self.cache_dir).expanduser().resolve())
 
-        options = options or get_config("executor.slurm.options")
+        # To allow passing empty dictionary
+        if options is None:
+            options = get_config("executors.slurm.options")
         self.options = deepcopy(options)
 
         self.do_cleanup = do_cleanup
