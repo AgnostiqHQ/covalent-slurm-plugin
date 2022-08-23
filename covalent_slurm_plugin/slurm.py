@@ -75,9 +75,9 @@ class SlurmExecutor(BaseAsyncExecutor):
         address: str,
         ssh_key_file: str,
         remote_workdir: str,
-        options: Dict,
+        options: Dict = None,
         poll_freq: int = 30,
-        cache_dir: str = str(Path("~/.cache/covalent").expanduser().resolve()),
+        cache_dir: str = None,
         do_cleanup: bool = True,
         **kwargs,
     ):
@@ -95,6 +95,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         self.cache_dir = cache_dir or get_config("dispatcher.cache_dir")
         self.cache_dir = str(Path(self.cache_dir).expanduser().resolve())
 
+        options = options or get_config("executor.slurm.options")
         self.options = deepcopy(options)
 
         self.do_cleanup = do_cleanup
