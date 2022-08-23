@@ -152,6 +152,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
         poll_freq=30,
         cache_dir="~/.cache/covalent",
         options={},
+        slurm_path="sample_path",
     )
 
     proc_mock.returncode = 0
@@ -162,7 +163,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
 
     # Check completed status does not give any errors
     await executor._poll_slurm(0, conn_mock)
-    assert conn_mock.run.call_count == 2
+    conn_mock.run.assert_called_once()
 
     # Now give an "error" in the get_status method and check that the
     # correct exception is raised.
@@ -177,7 +178,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
         assert type(raised_exception) == type(expected_exception)
         assert raised_exception.args == expected_exception.args
     
-    assert conn_mock.run.call_count == 2
+    conn_mock.run.assert_called_once()
 
 
 @pytest.mark.asyncio

@@ -44,12 +44,15 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "username": "",
     "address": "",
     "ssh_key_file": "",
-    "remote_workdir": "workdir",
-    "poll_freq": 30,
+    "remote_workdir": "covalent-workdir",
+    "slurm_path": None,
+    "conda_env": None,
     "cache_dir": str(Path(get_config("dispatcher.cache_dir")).expanduser().resolve()),
     "options": {
         "parsable": "",
     },
+    "poll_freq": 30,
+    "cleanup": True,
 }
 
 executor_plugin_name = "SlurmExecutor"
@@ -64,6 +67,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         ssh_key_file: Private RSA key used to authenticate over SSH.
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
+        conda_env: Name of conda environment on which to run the function.
         cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
         poll_freq: Frequency with which to poll a submitted job.
@@ -75,8 +79,9 @@ class SlurmExecutor(BaseAsyncExecutor):
         username: str,
         address: str,
         ssh_key_file: str,
-        remote_workdir: str,
-        slurm_path: str = "",
+        remote_workdir: str = "covalent-workdir",
+        slurm_path: str = None,
+        conda_env: str = None,
         cache_dir: str = None,
         options: Dict = None,
         poll_freq: int = 30,
@@ -93,7 +98,7 @@ class SlurmExecutor(BaseAsyncExecutor):
 
         self.remote_workdir = remote_workdir
         self.slurm_path = slurm_path
-        self.poll_freq = poll_freq
+        self.conda_env = conda_env
 
         cache_dir = cache_dir or get_config("dispatcher.cache_dir")
         self.cache_dir = str(Path(cache_dir).expanduser().resolve())
@@ -103,7 +108,10 @@ class SlurmExecutor(BaseAsyncExecutor):
             options = get_config("executors.slurm.options")
         self.options = deepcopy(options)
 
+        self.poll_freq = poll_freq
         self.cleanup = cleanup
+
+        self.LOAD_SLURM_PREFIX = "source /etc/profile\n module whatis slurm &> /dev/null\n if [ $? -eq 0 ] ; then\n module load slurm\n fi\n"
 
     async def _client_connect(self) -> Tuple[bool, asyncssh.SSHClientConnection]:
         """
@@ -261,10 +269,19 @@ wait
             return Result.NEW_OBJ
         
         cmd_scontrol = f"scontrol show job {job_id}"
-        
-        verify_scontrol = await conn.run("which scontrol")
-        if verify_scontrol.returncode != 0:
+
+        if self.slurm_path:
+            app_log.debug("Exporting slurm path for scontrol...")
             cmd_scontrol = f"export PATH=$PATH:{self.slurm_path} && {cmd_scontrol}"
+        
+        else:
+            app_log.debug("Verifying slurm installation for scontrol...")
+            proc_verify_scontrol = await conn.run(self.LOAD_SLURM_PREFIX + "which scontrol")
+        
+            if proc_verify_scontrol.returncode != 0:
+                raise RuntimeError("Please provide `slurm_path` to run scontrol command")
+            
+            cmd_scontrol = self.LOAD_SLURM_PREFIX + cmd_scontrol
 
         proc = await conn.run(cmd_scontrol)
         return proc.stdout.strip()
@@ -414,9 +431,18 @@ wait
             app_log.debug(f"Running the script: {remote_slurm_filename} ...")
             cmd_sbatch = f"sbatch {remote_slurm_filename}"
             
-            verify_sbatch = await conn.run("which sbatch")
-            if verify_sbatch.returncode != 0:
+            if self.slurm_path:
+                app_log.debug("Exporting slurm path for sbatch...")
                 cmd_sbatch = f"export PATH=$PATH:{self.slurm_path} && {cmd_sbatch}"
+            
+            else:
+                app_log.debug("Verifying slurm installation for sbatch...")
+                proc_verify_sbatch = await conn.run(self.LOAD_SLURM_PREFIX + "which sbatch")
+                
+                if proc_verify_sbatch.returncode != 0:
+                    raise RuntimeError("Please provide `slurm_path` to run sbatch command")
+                
+                cmd_sbatch = self.LOAD_SLURM_PREFIX + cmd_sbatch
 
             proc = await conn.run(cmd_sbatch)
 
