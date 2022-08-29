@@ -4,6 +4,12 @@
 
 <img src="https://raw.githubusercontent.com/AgnostiqHQ/covalent-slurm-plugin/main/assets/slurm_readme_banner.jpg" width=150%>
 
+[![covalent](https://img.shields.io/badge/covalent-0.177.0-purple)](https://github.com/AgnostiqHQ/covalent)
+[![python](https://img.shields.io/pypi/pyversions/covalent-slurm-plugin)](https://github.com/AgnostiqHQ/covalent-slurm-plugin)
+[![tests](https://github.com/AgnostiqHQ/covalent-slurm-plugin/actions/workflows/tests.yml/badge.svg)](https://github.com/AgnostiqHQ/covalent-slurm-plugin/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/AgnostiqHQ/covalent-slurm-plugin/branch/main/graph/badge.svg?token=QNTR18SR5H)](https://codecov.io/gh/AgnostiqHQ/covalent-slurm-plugin)
+[![agpl](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
+
 </div>
 
 ## Covalent Slurm Plugin

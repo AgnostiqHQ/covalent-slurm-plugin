@@ -86,15 +86,30 @@ jobs:
           tar xzf covalent-slurm-plugin-${VERSION}.tar.gz
           diff -r covalent-slurm-plugin-${VERSION}/covalent_slurm_plugin/ ../covalent_slurm_plugin/
           rm -rf covalent-slurm-plugin-${VERSION}/
-          cd ..
 
       - name: Install Slurm plugin
         run: |
           VERSION="$(cat ./VERSION)"
           pip install ./dist/covalent-slurm-plugin-${VERSION}.tar.gz
 
+      - name: Test import via entrypoint
+        run: from covalent.executor import SlurmExecutor
+        shell: python
+
       - name: Run tests
-        run: PYTHONPATH=$PWD/tests pytest -vv tests/
+        run: PYTHONPATH=$PWD/tests pytest -vv tests/ --cov=covalent_slurm_plugin
+
+      - name: Generate coverage report
+        run: coverage xml -o coverage.xml
+      
+      - name: Upload report to Codecov
+        if: >
+          matrix.os == 'ubuntu-latest'
+          && matrix.container == 'python:3.8-buster'
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          name: "Plugin Unit Tests"
 
       - name: Get latest release
         uses: actions-ecosystem/action-get-latest-tag@v1
