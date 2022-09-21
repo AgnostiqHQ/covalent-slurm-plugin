@@ -177,7 +177,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
         expected_exception = RuntimeError("Job failed with status:\n", "AN ERROR")
         assert type(raised_exception) == type(expected_exception)
         assert raised_exception.args == expected_exception.args
-    
+
     conn_mock.run.assert_called_once()
 
 

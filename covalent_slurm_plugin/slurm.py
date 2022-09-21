@@ -160,7 +160,7 @@ class SlurmExecutor(BaseAsyncExecutor):
             remote_result_filename: Result file on remote machine
             remote_stdout_filename: Standard out file on remote machine
             remote_stderr_filename: Standard error file on remote machine
-        
+
         Returns:
             None
         """
@@ -267,20 +267,20 @@ wait
         job_id = info_dict.get("job_id")
         if job_id is None:
             return Result.NEW_OBJ
-        
+
         cmd_scontrol = f"scontrol show job {job_id}"
 
         if self.slurm_path:
             app_log.debug("Exporting slurm path for scontrol...")
             cmd_scontrol = f"export PATH=$PATH:{self.slurm_path} && {cmd_scontrol}"
-        
+
         else:
             app_log.debug("Verifying slurm installation for scontrol...")
             proc_verify_scontrol = await conn.run(self.LOAD_SLURM_PREFIX + "which scontrol")
-        
+
             if proc_verify_scontrol.returncode != 0:
                 raise RuntimeError("Please provide `slurm_path` to run scontrol command")
-            
+
             cmd_scontrol = self.LOAD_SLURM_PREFIX + cmd_scontrol
 
         proc = await conn.run(cmd_scontrol)
@@ -430,18 +430,18 @@ wait
 
             app_log.debug(f"Running the script: {remote_slurm_filename} ...")
             cmd_sbatch = f"sbatch {remote_slurm_filename}"
-            
+
             if self.slurm_path:
                 app_log.debug("Exporting slurm path for sbatch...")
                 cmd_sbatch = f"export PATH=$PATH:{self.slurm_path} && {cmd_sbatch}"
-            
+
             else:
                 app_log.debug("Verifying slurm installation for sbatch...")
                 proc_verify_sbatch = await conn.run(self.LOAD_SLURM_PREFIX + "which sbatch")
-                
+
                 if proc_verify_sbatch.returncode != 0:
                     raise RuntimeError("Please provide `slurm_path` to run sbatch command")
-                
+
                 cmd_sbatch = self.LOAD_SLURM_PREFIX + cmd_sbatch
 
             proc = await conn.run(cmd_sbatch)
@@ -465,7 +465,7 @@ wait
 
             if exception:
                 raise RuntimeError(exception)
-            
+
             app_log.debug("Preparing for teardown...")
             self._remote_func_filename = remote_func_filename
             self._remote_slurm_filename = remote_slurm_filename
