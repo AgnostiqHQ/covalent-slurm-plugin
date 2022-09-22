@@ -22,6 +22,7 @@
 
 import os
 from functools import partial
+from pathlib import Path
 from unittest import mock
 
 import aiofiles
@@ -29,8 +30,8 @@ import pytest
 from covalent._results_manager.result import Result
 from covalent._workflow.transport import TransportableObject
 from covalent.executor.base import wrapper_fn
+
 from covalent_slurm_plugin import SlurmExecutor
-from pathlib import Path
 
 aiofiles.threadpool.wrap.register(mock.MagicMock)(
     lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs)
