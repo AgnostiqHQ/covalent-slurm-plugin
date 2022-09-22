@@ -37,13 +37,16 @@ aiofiles.threadpool.wrap.register(mock.MagicMock)(
     lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs)
 )
 
+
 @pytest.fixture
 def proc_mock():
     return mock.Mock()
 
+
 @pytest.fixture
 def conn_mock():
     return mock.Mock()
+
 
 def test_init():
     """Test that initialization properly sets member variables."""
@@ -205,7 +208,9 @@ async def test_query_result(mocker, proc_mock, conn_mock):
     conn_mock.run = mock.AsyncMock(return_value=proc_mock)
 
     try:
-        await executor._query_result(result_filename="mock_result", task_results_dir="", conn=conn_mock)
+        await executor._query_result(
+            result_filename="mock_result", task_results_dir="", conn=conn_mock
+        )
     except Exception as raised_exception:
         expected_exception = FileNotFoundError(1, "stderr")
         assert type(raised_exception) == type(expected_exception)
