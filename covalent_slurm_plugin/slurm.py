@@ -25,17 +25,17 @@ import os
 import re
 import sys
 from copy import deepcopy
-from typing import Any, Callable, Dict, List, Union, Tuple
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Tuple, Union
 
 import aiofiles
+import asyncssh
 import cloudpickle as pickle
 from aiofiles import os as async_os
 from covalent._results_manager.result import Result
 from covalent._shared_files import logger
-from pathlib import Path
-from covalent.executor.base import BaseAsyncExecutor
 from covalent._shared_files.config import get_config
-import asyncssh
+from covalent.executor.base import BaseAsyncExecutor
 
 app_log = logger.app_log
 log_stack_info = logger.log_stack_info
@@ -149,7 +149,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         remote_slurm_filename: str,
         remote_result_filename: str,
         remote_stdout_filename: str,
-        remote_stderr_filename: str
+        remote_stderr_filename: str,
     ) -> None:
         """
         Function to perform cleanup on remote machine
@@ -160,7 +160,7 @@ class SlurmExecutor(BaseAsyncExecutor):
             remote_result_filename: Result file on remote machine
             remote_stdout_filename: Standard out file on remote machine
             remote_stderr_filename: Standard error file on remote machine
-        
+
         Returns:
             None
         """
@@ -252,7 +252,9 @@ wait
 
         return slurm_preamble + slurm_conda + slurm_python_version + slurm_body
 
-    async def get_status(self, info_dict: dict, conn: asyncssh.SSHClientConnection) -> Union[Result, str]:
+    async def get_status(
+        self, info_dict: dict, conn: asyncssh.SSHClientConnection
+    ) -> Union[Result, str]:
         """Query the status of a job previously submitted to Slurm.
 
         Args:
@@ -267,20 +269,20 @@ wait
         job_id = info_dict.get("job_id")
         if job_id is None:
             return Result.NEW_OBJ
-        
+
         cmd_scontrol = f"scontrol show job {job_id}"
 
         if self.slurm_path:
             app_log.debug("Exporting slurm path for scontrol...")
             cmd_scontrol = f"export PATH=$PATH:{self.slurm_path} && {cmd_scontrol}"
-        
+
         else:
             app_log.debug("Verifying slurm installation for scontrol...")
             proc_verify_scontrol = await conn.run(self.LOAD_SLURM_PREFIX + "which scontrol")
-        
+
             if proc_verify_scontrol.returncode != 0:
                 raise RuntimeError("Please provide `slurm_path` to run scontrol command")
-            
+
             cmd_scontrol = self.LOAD_SLURM_PREFIX + cmd_scontrol
 
         proc = await conn.run(cmd_scontrol)
@@ -311,7 +313,9 @@ wait
         if "COMPLETED" not in status:
             raise RuntimeError("Job failed with status:\n", status)
 
-    async def _query_result(self, result_filename: str, task_results_dir: str, conn: asyncssh.SSHClientConnection) -> Any:
+    async def _query_result(
+        self, result_filename: str, task_results_dir: str, conn: asyncssh.SSHClientConnection
+    ) -> Any:
         """Query and retrieve the task result including stdout and stderr logs.
 
         Args:
@@ -337,8 +341,8 @@ wait
         stdout_file = os.path.join(task_results_dir, os.path.basename(self.options["output"]))
         stderr_file = os.path.join(task_results_dir, os.path.basename(self.options["error"]))
 
-        await asyncssh.scp((conn, self.options['output']), stdout_file)
-        await asyncssh.scp((conn, self.options['error']), stderr_file)
+        await asyncssh.scp((conn, self.options["output"]), stdout_file)
+        await asyncssh.scp((conn, self.options["error"]), stderr_file)
 
         async with aiofiles.open(local_result_filename, "rb") as f:
             contents = await f.read()
@@ -379,11 +383,13 @@ wait
         ssh_success, conn = await self._client_connect()
 
         if not ssh_success:
-            raise RuntimeError(f"Could not connect to host: '{self.address}' as user: '{self.username}'")
+            raise RuntimeError(
+                f"Could not connect to host: '{self.address}' as user: '{self.username}'"
+            )
 
         async with aiofiles.tempfile.NamedTemporaryFile(
-                    dir=self.cache_dir
-                ) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
+            dir=self.cache_dir
+        ) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
 
             # Write the function to file
             app_log.debug("Writing function, args, kwargs to file...")
@@ -430,18 +436,18 @@ wait
 
             app_log.debug(f"Running the script: {remote_slurm_filename} ...")
             cmd_sbatch = f"sbatch {remote_slurm_filename}"
-            
+
             if self.slurm_path:
                 app_log.debug("Exporting slurm path for sbatch...")
                 cmd_sbatch = f"export PATH=$PATH:{self.slurm_path} && {cmd_sbatch}"
-            
+
             else:
                 app_log.debug("Verifying slurm installation for sbatch...")
                 proc_verify_sbatch = await conn.run(self.LOAD_SLURM_PREFIX + "which sbatch")
-                
+
                 if proc_verify_sbatch.returncode != 0:
                     raise RuntimeError("Please provide `slurm_path` to run sbatch command")
-                
+
                 cmd_sbatch = self.LOAD_SLURM_PREFIX + cmd_sbatch
 
             proc = await conn.run(cmd_sbatch)
@@ -465,12 +471,11 @@ wait
 
             if exception:
                 raise RuntimeError(exception)
-            
+
             app_log.debug("Preparing for teardown...")
             self._remote_func_filename = remote_func_filename
             self._remote_slurm_filename = remote_slurm_filename
             self._result_filename = result_filename
-
 
             app_log.debug("Closing SSH connection...")
             conn.close()
@@ -489,8 +494,8 @@ wait
                 remote_func_filename=self._remote_func_filename,
                 remote_slurm_filename=self._remote_slurm_filename,
                 remote_result_filename=os.path.join(self.remote_workdir, self._result_filename),
-                remote_stdout_filename=self.options['output'],
-                remote_stderr_filename=self.options['error'],
+                remote_stdout_filename=self.options["output"],
+                remote_stderr_filename=self.options["error"],
             )
 
         app_log.debug("Closing SSH connection...")

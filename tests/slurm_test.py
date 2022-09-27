@@ -22,6 +22,7 @@
 
 import os
 from functools import partial
+from pathlib import Path
 from unittest import mock
 
 import aiofiles
@@ -29,20 +30,23 @@ import pytest
 from covalent._results_manager.result import Result
 from covalent._workflow.transport import TransportableObject
 from covalent.executor.base import wrapper_fn
+
 from covalent_slurm_plugin import SlurmExecutor
-from pathlib import Path
 
 aiofiles.threadpool.wrap.register(mock.MagicMock)(
     lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs)
 )
 
+
 @pytest.fixture
 def proc_mock():
     return mock.Mock()
 
+
 @pytest.fixture
 def conn_mock():
     return mock.Mock()
+
 
 def test_init():
     """Test that initialization properly sets member variables."""
@@ -177,7 +181,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
         expected_exception = RuntimeError("Job failed with status:\n", "AN ERROR")
         assert type(raised_exception) == type(expected_exception)
         assert raised_exception.args == expected_exception.args
-    
+
     conn_mock.run.assert_called_once()
 
 
@@ -204,7 +208,9 @@ async def test_query_result(mocker, proc_mock, conn_mock):
     conn_mock.run = mock.AsyncMock(return_value=proc_mock)
 
     try:
-        await executor._query_result(result_filename="mock_result", task_results_dir="", conn=conn_mock)
+        await executor._query_result(
+            result_filename="mock_result", task_results_dir="", conn=conn_mock
+        )
     except Exception as raised_exception:
         expected_exception = FileNotFoundError(1, "stderr")
         assert type(raised_exception) == type(expected_exception)
