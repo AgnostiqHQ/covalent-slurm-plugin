@@ -43,7 +43,6 @@ on:
 env:
   PAUL_BLART: >
     '['
-    '"scottwn",'
     '"FyzHsn",'
     '"wjcunningham7",'
     '"santoshkumarradha"]'
@@ -53,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         if: github.event.inputs.stable_version
         with:
           persist-credentials: false

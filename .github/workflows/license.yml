@@ -35,7 +35,7 @@ jobs:
 
       - name: Check Python dependencies license names and type
         id: license_check_report
-        uses: pilosus/action-pip-license-checker
+        uses: pilosus/action-pip-license-checker@main
         with:
           requirements: "requirements.txt"
           fail: "Copyleft,Error,Other"
