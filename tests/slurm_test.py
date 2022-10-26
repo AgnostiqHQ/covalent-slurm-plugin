@@ -18,7 +18,7 @@
 #
 # Relief from the License may be granted by purchasing a commercial license.
 
-"""Tests for the SSH executor plugin."""
+"""Tests for the SLURM executor plugin."""
 
 import os
 from functools import partial
@@ -179,7 +179,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
         await executor._poll_slurm(0, conn_mock)
     except RuntimeError as raised_exception:
         expected_exception = RuntimeError("Job failed with status:\n", "AN ERROR")
-        assert type(raised_exception) == type(expected_exception)
+        assert isinstance(raised_exception, type(expected_exception))
         assert raised_exception.args == expected_exception.args
 
     conn_mock.run.assert_called_once()
@@ -213,7 +213,7 @@ async def test_query_result(mocker, proc_mock, conn_mock):
         )
     except Exception as raised_exception:
         expected_exception = FileNotFoundError(1, "stderr")
-        assert type(raised_exception) == type(expected_exception)
+        assert isinstance(raised_exception, type(expected_exception))
         assert raised_exception.args == expected_exception.args
 
     # Now mock result files.
