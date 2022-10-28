@@ -201,9 +201,10 @@ class SlurmExecutor(BaseAsyncExecutor):
         slurm_preamble = "#!/bin/bash\n"
         for key, value in self.options.items():
             slurm_preamble += "#SBATCH "
-            slurm_preamble += f"-{key}" if len(key) == 1 else f"--{key}"
-            if value:
-                slurm_preamble += f" {value}"
+            if len(key) == 1:
+                slurm_preamble += f"-{key}" + (f" {value}" if value else "")
+            else:
+                slurm_preamble += f"--{key}" + (f"={value}" if value else "")
             slurm_preamble += "\n"
         slurm_preamble += "\n"
 
