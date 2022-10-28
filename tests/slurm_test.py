@@ -79,11 +79,11 @@ def test_init():
     assert executor.options == {}
 
 
-def test_format_submit_script():
-    """Test that the script (in string form) which is to be run on the remote server is
-    created with no errors."""
+def test_format_py_script():
+    """Test that the python script (in string form) which is to be executed (via srun)
+    on the remote server is created with no errors."""
 
-    executor = SlurmExecutor(
+    executor_0 = SlurmExecutor(
         username="test_user",
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
@@ -101,17 +101,99 @@ def test_format_submit_script():
     )
     python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
 
-    dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
-    task_id = 3
+    dispatch_id = "148dedae-1b58-3870-z08d-db89bceec915"
+    task_id = 2
     func_filename = f"func-{dispatch_id}-{task_id}.pkl"
     result_filename = f"result-{dispatch_id}-{task_id}.pkl"
 
     try:
-        executor._format_submit_script(
-            func_filename,
-            result_filename,
-            python_version,
+        py_script_str = executor_0._format_py_script(
+            func_filename=func_filename,
+            result_filename=result_filename
         )
+        print(py_script_str)
+    except Exception as exc:
+        assert False, f"Exception while running _format_py_script: {exc}"
+
+
+def test_format_submit_script_default():
+    """Test that the shell script (in string form) which is to be submitted on
+    the remote server is created with no errors."""
+
+    executor_0 = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/federation/test_user/.cache/covalent",
+        poll_freq=30,
+        cache_dir="~/.cache/covalent",
+    )
+
+    def simple_task(x):
+        return x
+
+    transport_function = partial(
+        wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5)
+    )
+    python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
+
+    dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
+    task_id = 3
+    py_filename = f"script-{dispatch_id}-{task_id}.py"
+
+    try:
+        submit_script_str = executor_0._format_submit_script(
+            python_version=python_version,
+            py_filename=py_filename
+        )
+        print(submit_script_str)
+    except Exception as exc:
+        assert False, f"Exception while running _format_submit_script with default options: {exc}"
+
+    shebang = "#!/bin/bash\n"
+    assert submit_script_str.startswith(shebang), f"Missing '{shebang[:-1]}' in sbatch shell script"
+
+
+def test_format_submit_script():
+    """Test that the shell script (in string form) which is to be submitted on
+    the remote server is created with no errors."""
+
+    executor_1 = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/federation/test_user/.cache/covalent",
+        poll_freq=30,
+        cache_dir="~/.cache/covalent",
+        options={
+            "qos": "regular",
+            "time": "00:03:30",
+            "mail-type": "ALL",
+            "N": "1"
+        },
+        srun_options={
+            "cpu-bind": "none",
+            "n": "32",
+        }
+    )
+
+    def simple_task(x):
+        return x
+
+    transport_function = partial(
+        wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5)
+    )
+    python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
+
+    dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
+    task_id = 3
+    py_filename = f"script-{dispatch_id}-{task_id}.py"
+
+    try:
+        print(executor_1._format_submit_script(
+            python_version=python_version,
+            py_filename=py_filename
+        ))
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
 
