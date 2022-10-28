@@ -226,7 +226,7 @@ fi
 """
         # checks remote python version
         slurm_python_version = f"""
-remote_py_version=$(python -c "print(__import__('sys').version_info[0])").$(python -c "print(__import__('sys').version_info[1])")
+remote_py_version=$(python -c "print('.'.join(map(str, __import__('sys').version_info[:2])))")
 if [[ "{python_version}" != $remote_py_version ]] ; then
   >&2 echo "Python version mismatch. Please install Python {python_version} in the compute environment."
   exit 199
