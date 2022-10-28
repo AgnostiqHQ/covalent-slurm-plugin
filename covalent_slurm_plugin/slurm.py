@@ -534,7 +534,7 @@ with open("{result_filename}", "wb") as f:
                 remote_stderr_filename=self.options["error"],
             )
 
-        app_log.debug("Closing SSH connection...")
-        conn.close()
-        await conn.wait_closed()
-        app_log.debug("SSH connection closed, teardown complete")
+            app_log.debug("Closing SSH connection...")
+            conn.close()
+            await conn.wait_closed()
+            app_log.debug("SSH connection closed, teardown complete")
