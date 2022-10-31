@@ -174,7 +174,12 @@ def test_format_submit_script():
         srun_options={
             "cpu-bind": "none",
             "n": "32",
-        }
+        },
+        prerun_commands=[
+            "export OMP_NUM_THREADS=1",
+            "export OMP_PLACES=threads",
+            "export OMP_PROC_BIND=true",
+        ]
     )
 
     def simple_task(x):

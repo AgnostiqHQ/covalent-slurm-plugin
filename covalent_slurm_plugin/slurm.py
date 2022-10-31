@@ -54,6 +54,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "srun_options": {
         "slurmd-debug": "4",
     },
+    "prerun_commands": None,
     "poll_freq": 30,
     "cleanup": True,
 }
@@ -74,6 +75,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
         srun_options: Dictionary of parameters passed to srun inside submit script.
+        prerun_commands: List of shell commands to run before submitting with srun.
         poll_freq: Frequency with which to poll a submitted job.
         cleanup: Whether to perform cleanup or not on remote machine.
     """
@@ -89,6 +91,7 @@ class SlurmExecutor(BaseAsyncExecutor):
         cache_dir: str = None,
         options: Dict = None,
         srun_options: Dict = None,
+        prerun_commands: List[str] = None,
         poll_freq: int = 30,
         cleanup: bool = True,
         **kwargs,
@@ -117,6 +120,7 @@ class SlurmExecutor(BaseAsyncExecutor):
             srun_options = get_config("executors.slurm.srun_options")
         self.srun_options = deepcopy(srun_options)
 
+        self.prerun_commands = list(prerun_commands) if prerun_commands else []
         self.poll_freq = poll_freq
         self.cleanup = cleanup
 
@@ -233,6 +237,12 @@ if [[ "{python_version}" != $remote_py_version ]] ; then
   exit 199
 fi
 """
+        # runs pre-run commands
+        if self.prerun_commands:
+            slurm_prerun_commands = "\n".join([""] + self.prerun_commands + [""])
+        else:
+            slurm_prerun_commands = ""
+
         srun_options_str = ""
         for key, value in self.srun_options.items():
             srun_options_str += " "
@@ -254,6 +264,7 @@ wait
             slurm_preamble,
             slurm_conda,
             slurm_python_version,
+            slurm_prerun_commands,
             slurm_body
         ])
 
