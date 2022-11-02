@@ -46,9 +46,15 @@ gpus = 4
 gpu-bind = "single:1"
 ```
 
-The first stanza describes default connection parameters for a user who can connect to the Slurm login node using `ssh -i /home/user/.ssh/id_rsa user@login.cluster.org`. The second stanza describes default parameters for `#SBATCH` directives in a Slurm submit script. The final stanza describes default options passed directly to `srun`, which may be necessary in some use cases.
+The first stanza describes default connection parameters for a user who can connect to the Slurm login node using, for example:
 
-The example above generates a script with the following preamble:
+```console
+ssh -i /home/user/.ssh/id_rsa user@login.cluster.org
+```
+
+The second stanza describes default parameters for `#SBATCH` directives in a Slurm submit script. Similarly, the final stanza describes default parameters passed directly to `srun`, which may be necessary in some use cases.
+
+Accordingly, the example above generates a script with the following preamble,
 
 ```console
 #!/bin/bash
@@ -60,13 +66,13 @@ The example above generates a script with the following preamble:
 #SBATCH --qos=regular
 ```
 
-In this script, the job is submitted using:
+where the job is submitted with:
 
 ```console
 srun --cpu_bind=cores --gpus=4 --gpu-bind=single:1
 ```
 
-Within a workflow, users can then decorate electrons using the default configuration settings:
+To use the configuration settings, an electron's executor must be specified with a string argument, in this case:  
 
 ```python
 import covalent as ct
@@ -76,7 +82,7 @@ def my_task(x, y):
     return x + y
 ```
 
-or use `SlurmExecutor` instance to customize behavior scoped to specific tasks:
+Alternatively, specifying a `SlurmExecutor` instance allows users customize behavior scoped to specific tasks. The `prerun_commands` parameter can be used here to provide a list of shell commands to execute (on the allocated compute node(s)) before submitting the workflow.
 
 ```python
 executor = ct.executor.SlurmExecutor(
@@ -101,8 +107,6 @@ executor = ct.executor.SlurmExecutor(
 def my_custom_task(x, y):
     return x + y
 ```
-
-As seen above, the `prerun_commands` argument can be used to execute a list of shell commands before submitting the workflow.
 
 For more information about how to get started with Covalent, check out the project [homepage](https://github.com/AgnostiqHQ/covalent) and the official [documentation](https://covalent.readthedocs.io/en/latest/).
 
