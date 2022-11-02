@@ -93,14 +93,6 @@ def test_format_py_script():
         options={},
     )
 
-    def simple_task(x):
-        return x
-
-    transport_function = partial(
-        wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5)
-    )
-    python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
-
     dispatch_id = "148dedae-1b58-3870-z08d-db89bceec915"
     task_id = 2
     func_filename = f"func-{dispatch_id}-{task_id}.pkl"
