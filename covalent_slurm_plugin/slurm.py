@@ -35,7 +35,7 @@ from aiofiles import os as async_os
 from covalent._results_manager.result import Result
 from covalent._shared_files import logger
 from covalent._shared_files.config import get_config
-from covalent.executor.base import BaseAsyncExecutor
+from covalent.executor.base import AsyncBaseExecutor
 
 app_log = logger.app_log
 log_stack_info = logger.log_stack_info
@@ -62,7 +62,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
 executor_plugin_name = "SlurmExecutor"
 
 
-class SlurmExecutor(BaseAsyncExecutor):
+class SlurmExecutor(AsyncBaseExecutor):
     """Slurm executor plugin class.
 
     Args:
