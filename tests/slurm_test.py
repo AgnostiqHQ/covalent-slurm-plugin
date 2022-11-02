@@ -20,7 +20,6 @@
 
 """Tests for the SLURM executor plugin."""
 
-import os
 from functools import partial
 from pathlib import Path
 from unittest import mock
