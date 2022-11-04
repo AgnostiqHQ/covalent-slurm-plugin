@@ -55,6 +55,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
         "slurmd-debug": "4",
     },
     "prerun_commands": None,
+    "postrun_commands": None,
     "poll_freq": 30,
     "cleanup": True,
 }
@@ -76,6 +77,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         options: Dictionary of parameters used to build a Slurm submit script.
         srun_options: Dictionary of parameters passed to srun inside submit script.
         prerun_commands: List of shell commands to run before submitting with srun.
+        postrun_commands: List of shell commands to run after submitting with srun.
         poll_freq: Frequency with which to poll a submitted job.
         cleanup: Whether to perform cleanup or not on remote machine.
     """
@@ -92,6 +94,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         options: Dict = None,
         srun_options: Dict = None,
         prerun_commands: List[str] = None,
+        postrun_commands: List[str] = None,
         poll_freq: int = 30,
         cleanup: bool = True,
         **kwargs,
@@ -121,6 +124,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.srun_options = deepcopy(srun_options)
 
         self.prerun_commands = list(prerun_commands) if prerun_commands else []
+        self.postrun_commands = list(postrun_commands) if postrun_commands else []
         self.poll_freq = poll_freq
         self.cleanup = cleanup
 
@@ -243,6 +247,7 @@ fi
         else:
             slurm_prerun_commands = ""
 
+        # uses srun to run script calling pickled function
         srun_options_str = ""
         for key, value in self.srun_options.items():
             srun_options_str += " "
@@ -252,19 +257,23 @@ fi
                 srun_options_str += f"--{key}" + (f"={value}" if value else "")
 
         remote_py_filename = os.path.join(self.remote_workdir, py_filename)
+        slurm_srun = f"srun{srun_options_str} python {remote_py_filename}"
 
-        # uses srun to run script calling pickled function
-        slurm_body = f"""
-srun{srun_options_str} python {remote_py_filename}
+        # runs post-run commands
+        if self.postrun_commands:
+            slurm_postrun_commands = "\n".join([""] + self.postrun_commands + [""])
+        else:
+            slurm_postrun_commands = ""
 
-wait
-"""
+        slurm_body = "\n".join([slurm_prerun_commands,
+                                slurm_srun,
+                                slurm_postrun_commands])
+
         # assemble script
         return "".join([
             slurm_preamble,
             slurm_conda,
             slurm_python_version,
-            slurm_prerun_commands,
             slurm_body
         ])
 

@@ -170,6 +170,10 @@ def test_format_submit_script():
             "export OMP_NUM_THREADS=1",
             "export OMP_PLACES=threads",
             "export OMP_PROC_BIND=true",
+            "srun --ntasks-per-node 1 dcgmi profile --pause"
+        ],
+        postrun_commands=[
+            "srun --ntasks-per-node 1 dcgmi profile --resume"
         ]
     )
 
