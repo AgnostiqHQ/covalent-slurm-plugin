@@ -54,6 +54,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "srun_options": {
         "slurmd-debug": "4",
     },
+    "srun_append": None,
     "prerun_commands": None,
     "postrun_commands": None,
     "poll_freq": 30,
@@ -76,6 +77,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
         srun_options: Dictionary of parameters passed to srun inside submit script.
+        srun_append: Command nested into srun call.
         prerun_commands: List of shell commands to run before submitting with srun.
         postrun_commands: List of shell commands to run after submitting with srun.
         poll_freq: Frequency with which to poll a submitted job.
@@ -93,6 +95,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         cache_dir: str = None,
         options: Dict = None,
         srun_options: Dict = None,
+        srun_append: str = None,
         prerun_commands: List[str] = None,
         postrun_commands: List[str] = None,
         poll_freq: int = 30,
@@ -123,6 +126,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             srun_options = get_config("executors.slurm.srun_options")
         self.srun_options = deepcopy(srun_options)
 
+        self.srun_append = srun_append
         self.prerun_commands = list(prerun_commands) if prerun_commands else []
         self.postrun_commands = list(postrun_commands) if postrun_commands else []
         self.poll_freq = poll_freq
@@ -257,7 +261,18 @@ fi
                 srun_options_str += f"--{key}" + (f"={value}" if value else "")
 
         remote_py_filename = os.path.join(self.remote_workdir, py_filename)
-        slurm_srun = f"srun{srun_options_str} python {remote_py_filename}"
+        slurm_srun = f"srun{srun_options_str} \\"
+
+        if self.srun_append:
+            # insert any appended commands
+            slurm_srun += f"""
+{self.srun_append} \\
+"""
+        else:
+            slurm_srun += """
+"""
+
+        slurm_srun += f"python {remote_py_filename}"
 
         # runs post-run commands
         if self.postrun_commands:
@@ -265,9 +280,11 @@ fi
         else:
             slurm_postrun_commands = ""
 
+        # assemble commands into slurm body
         slurm_body = "\n".join([slurm_prerun_commands,
                                 slurm_srun,
-                                slurm_postrun_commands])
+                                slurm_postrun_commands,
+                                "wait"])
 
         # assemble script
         return "".join([
