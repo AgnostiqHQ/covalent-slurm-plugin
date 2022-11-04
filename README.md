@@ -82,7 +82,7 @@ def my_task(x, y):
     return x + y
 ```
 
-Alternatively, specifying a `SlurmExecutor` instance allows users customize behavior scoped to specific tasks. The `prerun_commands` parameter can be used here to provide a list of shell commands to execute before submitting the workflow. Similarly, the `postrun_commands` parameter takes a list of shell commands to execute *after* submitting the script.
+Alternatively, specifying a `SlurmExecutor` instance allows users customize behavior scoped to specific tasks. The `prerun_commands` parameter can be used here to provide a list of shell commands to execute before submitting the workflow. Similarly, the `postrun_commands` parameter takes a list of shell commands to execute *after* submitting the script. Finally, the `srun_append` parameter can be used to modify the call to `srun` that submits the workflow, by adding commands outside the scope of `srun`'s options.
 
 An example of a custom executor instance is shown below:
 
@@ -98,10 +98,13 @@ executor = ct.executor.SlurmExecutor(
         "slurmd-debug": 4,
         "cpu_bind": "cores"
     },
+    srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
     prerun_commands = [
-        "module load package/1.2.3"
+        "module load package/1.2.3",
+        "srun --ntasks-per-node 1 dcgmi profile --pause"
     ],
     postrun_commands = [
+        "srun --ntasks-per-node 1 dcgmi profile --resume",
         "python ./path/to/my/post_process.py -j $SLURM_JOB_ID"
     ]
 )
@@ -109,6 +112,21 @@ executor = ct.executor.SlurmExecutor(
 @ct.electron(executor=executor)
 def my_custom_task(x, y):
     return x + y
+```
+
+The executor example above corresponds to an `sbatch` script with the following sequence of commands:
+
+```sh
+module load package/1.2.3  # load module
+srun --ntasks-per-node 1 dcgmi profile --pause  # pause hardware counter
+
+# run profiled workflow execution
+srun --slurmd-debug=4 --cpu_bind=cores \
+nsys profile --stats=true -t cuda --gpu-metrics-device=all \
+python /scratch/user/experiment1/workflow_script.py
+
+srun --ntasks-per-node 1 dcgmi profile --resume  # resume hardware counter
+python ./path/to/my/post_process.py -j $SLURM_JOB_ID  # do some post-processing
 ```
 
 For more information about how to get started with Covalent, check out the project [homepage](https://github.com/AgnostiqHQ/covalent) and the official [documentation](https://covalent.readthedocs.io/en/latest/).
