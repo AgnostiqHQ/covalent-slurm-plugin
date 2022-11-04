@@ -153,27 +153,24 @@ def test_format_submit_script():
         username="test_user",
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
-        remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=30,
-        cache_dir="~/.cache/covalent",
+        remote_workdir="/scratch/user/experiment1",
         options={
-            "qos": "regular",
-            "time": "00:03:30",
-            "mail-type": "ALL",
-            "N": "1"
+            "nodes": 1,
+            "cpus-per-task": 8,
+            "qos": "regular"
         },
         srun_options={
-            "cpu-bind": "none",
-            "n": "32",
+            "slurmd-debug": 4,
+            "cpu_bind": "cores"
         },
+        srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
         prerun_commands=[
-            "export OMP_NUM_THREADS=1",
-            "export OMP_PLACES=threads",
-            "export OMP_PROC_BIND=true",
+            "module load package/1.2.3",
             "srun --ntasks-per-node 1 dcgmi profile --pause"
         ],
         postrun_commands=[
-            "srun --ntasks-per-node 1 dcgmi profile --resume"
+            "srun --ntasks-per-node 1 dcgmi profile --resume",
+            "python ./path/to/my/post_process.py -j $SLURM_JOB_ID"
         ]
     )
 
