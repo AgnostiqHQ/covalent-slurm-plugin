@@ -82,7 +82,9 @@ def my_task(x, y):
     return x + y
 ```
 
-Alternatively, specifying a `SlurmExecutor` instance allows users customize behavior scoped to specific tasks. The `prerun_commands` parameter can be used here to provide a list of shell commands to execute (on the allocated compute node(s)) before submitting the workflow.
+Alternatively, specifying a `SlurmExecutor` instance allows users customize behavior scoped to specific tasks. The `prerun_commands` parameter can be used here to provide a list of shell commands to execute before submitting the workflow. Similarly, the `postrun_commands` parameter takes a list of shell commands to execute *after* submitting the script.
+
+An example of a custom executor instance is shown below:
 
 ```python
 executor = ct.executor.SlurmExecutor(
@@ -97,9 +99,10 @@ executor = ct.executor.SlurmExecutor(
         "cpu_bind": "cores"
     },
     prerun_commands = [
-        "export OMP_NUM_THREADS=1",
-        "export OMP_PLACES=threads",
-        "export OMP_PROC_BIND=true",
+        "module load package/1.2.3"
+    ],
+    postrun_commands = [
+        "python ./path/to/my/post_process.py -j $SLURM_JOB_ID"
     ]
 )
 
