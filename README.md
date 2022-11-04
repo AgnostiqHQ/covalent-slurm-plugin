@@ -72,7 +72,7 @@ where the job is submitted with:
 srun --cpu_bind=cores --gpus=4 --gpu-bind=single:1
 ```
 
-To use the configuration settings, an electron's executor must be specified with a string argument, in this case:  
+To use the configuration settings, an electron's executor must be specified with a string argument, in this case:
 
 ```python
 import covalent as ct
