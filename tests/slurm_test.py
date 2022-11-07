@@ -154,8 +154,9 @@ def test_format_submit_script():
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/scratch/user/experiment1",
-        options={"nodes": 1, "cpus-per-task": 8, "qos": "regular"},
-        srun_options={"slurmd-debug": 4, "cpu_bind": "cores"},
+        conda_env="my-conda-env",
+        options={"nodes": 1, "c": 8, "qos": "regular"},
+        srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
         srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
         prerun_commands=[
             "module load package/1.2.3",
@@ -260,7 +261,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
 
 @pytest.mark.asyncio
 async def test_query_result(mocker, proc_mock, conn_mock):
-    """Test querying results works as expected"""
+    """Test querying results works as expected."""
 
     executor = SlurmExecutor(
         username="test_user",
@@ -330,3 +331,80 @@ async def test_query_result(mocker, proc_mock, conn_mock):
         assert stdout == expected_stdout
         assert stderr == expected_stderr
         pickle_mock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run(mocker, proc_mock, conn_mock):
+    """Test calling run works as expected."""
+    executor = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/scratch/user/experiment1",
+        conda_env="my-conda-env",
+        options={"nodes": 1, "c": 8, "qos": "regular"},
+        srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
+        srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
+        prerun_commands=[
+            "module load package/1.2.3",
+            "srun --ntasks-per-node 1 dcgmi profile --pause",
+        ],
+        postrun_commands=[
+            "srun --ntasks-per-node 1 dcgmi profile --resume",
+            "python ./path/to/my/post_process.py -j $SLURM_JOB_ID",
+        ],
+    )
+
+    def f(x, y):
+        return x + y
+
+    dummy_function = partial(
+        wrapper_fn,
+        TransportableObject(f),
+        call_before=[],
+        call_after=[]
+    )
+
+    dummy_metadata = {
+        "dispatch_id": "259efebf-2c69-4981-a19e-ec90cdffd026",
+        "node_id": 1,
+        "results_dir": "results/directory/on/remote",
+    }
+
+    dummy_args = (dummy_function,
+                  [TransportableObject(2)],
+                  {"y": TransportableObject(3)},
+                  dummy_metadata)
+
+    conn_mock.run = mock.AsyncMock(return_value=proc_mock)
+
+    # check failed ssh connection handled as expected
+    async def __client_connect_fail(*_):
+        return False, conn_mock
+
+    with mock.patch.object(SlurmExecutor, '_client_connect', new=__client_connect_fail):
+        msg = f"Could not connect to host: '{executor.address}' as user: '{executor.username}'"
+        with pytest.raises(Exception) as exc_info:
+            await executor.run(*dummy_args)
+
+        assert exc_info.type is RuntimeError
+        assert exc_info.value.args == (msg,)
+
+    conn_mock.wait_closed = mock.AsyncMock(return_value=None)
+    proc_mock.returncode = 0
+    proc_mock.stderr = ""
+    proc_mock.stdout = "64145383 COMPLETED"
+
+    # check run call completes with no other errors
+    async def __client_connect_succeed(*_):
+        return True, conn_mock
+
+    async def __query_result(*_):
+        return None, proc_mock.stdout, proc_mock.stderr, None
+
+    patch_1 = mock.patch.object(SlurmExecutor, '_client_connect', new=__client_connect_succeed)
+    patch_2 = mock.patch.object(SlurmExecutor, '_query_result', new=__query_result)
+
+    with patch_1, patch_2:
+        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
+        await executor.run(*dummy_args)
