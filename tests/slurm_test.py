@@ -99,8 +99,7 @@ def test_format_py_script():
 
     try:
         py_script_str = executor_0._format_py_script(
-            func_filename=func_filename,
-            result_filename=result_filename
+            func_filename=func_filename, result_filename=result_filename
         )
         print(py_script_str)
     except Exception as exc:
@@ -134,15 +133,16 @@ def test_format_submit_script_default():
 
     try:
         submit_script_str = executor_0._format_submit_script(
-            python_version=python_version,
-            py_filename=py_filename
+            python_version=python_version, py_filename=py_filename
         )
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script with default options: {exc}"
 
     shebang = "#!/bin/bash\n"
-    assert submit_script_str.startswith(shebang), f"Missing '{shebang[:-1]}' in sbatch shell script"
+    assert submit_script_str.startswith(
+        shebang
+    ), f"Missing '{shebang[:-1]}' in sbatch shell script"
 
 
 def test_format_submit_script():
@@ -154,24 +154,17 @@ def test_format_submit_script():
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/scratch/user/experiment1",
-        options={
-            "nodes": 1,
-            "cpus-per-task": 8,
-            "qos": "regular"
-        },
-        srun_options={
-            "slurmd-debug": 4,
-            "cpu_bind": "cores"
-        },
+        options={"nodes": 1, "cpus-per-task": 8, "qos": "regular"},
+        srun_options={"slurmd-debug": 4, "cpu_bind": "cores"},
         srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
         prerun_commands=[
             "module load package/1.2.3",
-            "srun --ntasks-per-node 1 dcgmi profile --pause"
+            "srun --ntasks-per-node 1 dcgmi profile --pause",
         ],
         postrun_commands=[
             "srun --ntasks-per-node 1 dcgmi profile --resume",
-            "python ./path/to/my/post_process.py -j $SLURM_JOB_ID"
-        ]
+            "python ./path/to/my/post_process.py -j $SLURM_JOB_ID",
+        ],
     )
 
     def simple_task(x):
@@ -187,10 +180,11 @@ def test_format_submit_script():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        print(executor_1._format_submit_script(
-            python_version=python_version,
-            py_filename=py_filename
-        ))
+        print(
+            executor_1._format_submit_script(
+                python_version=python_version, py_filename=py_filename
+            )
+        )
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
 

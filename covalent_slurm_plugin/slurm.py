@@ -220,7 +220,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             slurm_preamble += "\n"
         slurm_preamble += "\n"
 
-        if hasattr(self, 'conda_env') and self.conda_env:
+        if hasattr(self, "conda_env") and self.conda_env:
             conda_env_str = self.conda_env
         else:
             conda_env_str = ""
@@ -281,18 +281,10 @@ fi
             slurm_postrun_commands = ""
 
         # assemble commands into slurm body
-        slurm_body = "\n".join([slurm_prerun_commands,
-                                slurm_srun,
-                                slurm_postrun_commands,
-                                "wait"])
+        slurm_body = "\n".join([slurm_prerun_commands, slurm_srun, slurm_postrun_commands, "wait"])
 
         # assemble script
-        return "".join([
-            slurm_preamble,
-            slurm_conda,
-            slurm_python_version,
-            slurm_body
-        ])
+        return "".join([slurm_preamble, slurm_conda, slurm_python_version, slurm_body])
 
     def _format_py_script(
         self,
