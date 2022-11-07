@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Enabled Codecov
 
-## [0.7.0] - 2022-11-04
+### Added
 
 - Modified executor to use `srun` in slurm script, instead of injecting python code and calling python directly.
 - Added new parameters to `SlurmExecutor` to allow finer control of jobs via options for `srun` and in-script commands (detailed below).
