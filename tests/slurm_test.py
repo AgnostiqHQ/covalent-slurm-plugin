@@ -358,12 +358,7 @@ async def test_run(mocker, proc_mock, conn_mock):
     def f(x, y):
         return x + y
 
-    dummy_function = partial(
-        wrapper_fn,
-        TransportableObject(f),
-        call_before=[],
-        call_after=[]
-    )
+    dummy_function = partial(wrapper_fn, TransportableObject(f), call_before=[], call_after=[])
 
     dummy_metadata = {
         "dispatch_id": "259efebf-2c69-4981-a19e-ec90cdffd026",
@@ -371,10 +366,12 @@ async def test_run(mocker, proc_mock, conn_mock):
         "results_dir": "results/directory/on/remote",
     }
 
-    dummy_args = (dummy_function,
-                  [TransportableObject(2)],
-                  {"y": TransportableObject(3)},
-                  dummy_metadata)
+    dummy_args = (
+        dummy_function,
+        [TransportableObject(2)],
+        {"y": TransportableObject(3)},
+        dummy_metadata,
+    )
 
     conn_mock.run = mock.AsyncMock(return_value=proc_mock)
 
@@ -382,7 +379,7 @@ async def test_run(mocker, proc_mock, conn_mock):
     async def __client_connect_fail(*_):
         return False, conn_mock
 
-    with mock.patch.object(SlurmExecutor, '_client_connect', new=__client_connect_fail):
+    with mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_fail):
         msg = f"Could not connect to host: '{executor.address}' as user: '{executor.username}'"
         with pytest.raises(Exception) as exc_info:
             await executor.run(*dummy_args)
@@ -402,8 +399,8 @@ async def test_run(mocker, proc_mock, conn_mock):
     async def __query_result(*_):
         return None, proc_mock.stdout, proc_mock.stderr, None
 
-    patch_1 = mock.patch.object(SlurmExecutor, '_client_connect', new=__client_connect_succeed)
-    patch_2 = mock.patch.object(SlurmExecutor, '_query_result', new=__query_result)
+    patch_1 = mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_succeed)
+    patch_2 = mock.patch.object(SlurmExecutor, "_query_result", new=__query_result)
 
     with patch_1, patch_2:
         mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
