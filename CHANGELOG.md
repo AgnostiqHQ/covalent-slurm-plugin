@@ -27,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Operations
 
+- Added Alejandro to paul blart group
+
+## [0.8.0] - 2022-11-19
+
+### Changed
+
+- Changed BaseAsyncExecutor to AsyncBaseExecutor
+- Updated covalent version to >=0.202.0,<1
+
+### Operations
+
 - Added license workflow
 
 ### Tests
