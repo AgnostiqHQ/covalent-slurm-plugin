@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+
+- Modified executor to use `srun` in slurm script, instead of injecting python code and calling python directly.
+- Added new parameters to `SlurmExecutor` to allow finer control of jobs via options for `srun` and in-script commands (see README.md).
+- Added `srun_append` parameter allowing insertion of intermediate command (see README.md).
+- Added `prerun_commands` and `postrun_commands` parameters allowing execution of in-script shell commands before and after the workflow submission via `srun` (see README.md).
+
 ### Operations
 
 - Added Alejandro to paul blart group
@@ -25,30 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Tests
 
 - Enabled Codecov
-
-### Added
-
-- Modified executor to use `srun` in slurm script, instead of injecting python code and calling python directly.
-- Added new parameters to `SlurmExecutor` to allow finer control of jobs via options for `srun` and in-script commands (detailed below).
-- Added `srun_append` parameter allowing insertion of intermediate command:
-
- ```sh
- srun --cpu_bind=cores <intermediate-command> python workflow_script.py
-```
-
- - Added `prerun_commands` and `postrun_commands` parameters allowing execution of in-script shell commands before and after (respectively) the workflow submission via `srun`. See example below.
-
-```sh
-# prerun commands
-module load package/1.2.3
-srun --ntasks-per-node 1 dcgmi profile --pause
-
-srun --cpu_bind=cores nsys -t cuda python workflow_script.py
-
-# postrun commands
-srun --ntasks-per-node 1 dcgmi profile --resume
-python ./path/to/my/post_process.py -j $SLURM_JOB_ID
-```
 
 ## [0.7.0] - 2022-08-23
 
