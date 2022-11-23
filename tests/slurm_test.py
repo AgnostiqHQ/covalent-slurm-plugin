@@ -374,6 +374,8 @@ async def test_run(mocker, proc_mock, conn_mock):
         dummy_metadata,
     )
 
+    dummy_error_msg = "dummy_error_message"
+
     # mock behavior
     conn_mock.run = mock.AsyncMock(return_value=proc_mock)
     conn_mock.wait_closed = mock.AsyncMock(return_value=None)
@@ -389,8 +391,11 @@ async def test_run(mocker, proc_mock, conn_mock):
     async def __client_connect_succeed(*_):
         return True, conn_mock
 
+    async def __poll_slurm_succeed(*_):
+        return
+
     async def __query_result_fail(*_):
-        return None, proc_mock.stdout, proc_mock.stderr, "exception"
+        return None, proc_mock.stdout, proc_mock.stderr, dummy_error_msg
 
     async def __query_result_succeed(*_):
         return "result", "", "", None
@@ -398,6 +403,7 @@ async def test_run(mocker, proc_mock, conn_mock):
     # patches
     patch_ccf = mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_fail)
     patch_ccs = mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_succeed)
+    patch_pss = mock.patch.object(SlurmExecutor, "_poll_slurm", new=__poll_slurm_succeed)
     patch_qrf = mock.patch.object(SlurmExecutor, "_query_result", new=__query_result_fail)
     patch_qrs = mock.patch.object(SlurmExecutor, "_query_result", new=__query_result_succeed)
 
@@ -440,13 +446,26 @@ async def test_run(mocker, proc_mock, conn_mock):
     reset_proc_mock()
 
     # check failed `cmd_sbatch` run on remote handled as expected
-    with patch_ccs:
-        proc_mock.stdout = "64145383 FAILED"
+    executor.slurm_path = "/path/to/slurm"
+    proc_mock.returncode = 1
+    with patch_ccs, patch_pss:
         mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
         with pytest.raises(Exception) as exc_info:
             await executor.run(*dummy_args)
         assert exc_info.type is RuntimeError
-        assert exc_info.value.args == ("Job failed with status:\n", proc_mock.stdout)
+        assert exc_info.value.args == ("",)
+    executor.slurm_path = None
+    reset_proc_mock()
+
+    # check failed query handled as expected
+    proc_mock.stdout = "64145383 FAILED"
+    with patch_ccs, patch_pss, patch_qrf:
+        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
+        with pytest.raises(Exception) as exc_info:
+            await executor.run(*dummy_args)
+        assert exc_info.type is RuntimeError
+        assert exc_info.value.args == (dummy_error_msg,)
+    reset_proc_mock()
 
     # check run call completes with no other errors
     proc_mock.stdout = "75256494 COMPLETED"
@@ -454,3 +473,72 @@ async def test_run(mocker, proc_mock, conn_mock):
         mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
         await executor.run(*dummy_args)
     reset_proc_mock()
+
+
+@pytest.mark.asyncio
+async def test_teardown(mocker, proc_mock, conn_mock):
+    """Test calling run works as expected."""
+    executor = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/scratch/user/experiment1",
+        conda_env="my-conda-env",
+        options={"nodes": 1, "c": 8, "qos": "regular"},
+        srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
+        srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
+        prerun_commands=[
+            "module load package/1.2.3",
+            "srun --ntasks-per-node 1 dcgmi profile --pause",
+        ],
+        postrun_commands=[
+            "srun --ntasks-per-node 1 dcgmi profile --resume",
+            "python ./path/to/my/post_process.py -j $SLURM_JOB_ID",
+        ],
+    )
+
+    # dummy objects
+    def f(x, y):
+        return x + y
+
+    dummy_function = partial(wrapper_fn, TransportableObject(f), call_before=[], call_after=[])
+
+    dummy_metadata = {
+        "dispatch_id": "259efebf-2c69-4981-a19e-ec90cdffd026",
+        "node_id": 1,
+        "results_dir": "results/directory/on/remote",
+    }
+
+    dummy_args = (
+        dummy_function,
+        [TransportableObject(2)],
+        {"y": TransportableObject(3)},
+        dummy_metadata,
+    )
+
+    # mock behavior
+    conn_mock.run = mock.AsyncMock(return_value=proc_mock)
+    conn_mock.wait_closed = mock.AsyncMock(return_value=None)
+
+    async def __client_connect_succeed(*_):
+        return True, conn_mock
+
+    async def __query_result_succeed(*_):
+        return "result", "", "", None
+
+    async def __perform_cleanup(*_, **__):
+        return
+
+    # patches
+    patch_ccs = mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_succeed)
+    patch_qrs = mock.patch.object(SlurmExecutor, "_query_result", new=__query_result_succeed)
+    patch_pc = mock.patch.object(SlurmExecutor, "perform_cleanup", new=__perform_cleanup)
+
+    # check teardown method works as expected
+    proc_mock.stdout = "86367505 COMPLETED"
+    proc_mock.stderr = ""
+    proc_mock.returncode = 0
+    with patch_ccs, patch_qrs, patch_pc:
+        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
+        await executor.run(*dummy_args)
+        await executor.teardown(dummy_metadata)
