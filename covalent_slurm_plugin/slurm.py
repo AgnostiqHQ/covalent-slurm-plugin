@@ -360,7 +360,6 @@ wait
         return result, stdout, stderr, exception
 
     async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
-
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
         results_dir = task_metadata["results_dir"]
@@ -390,7 +389,6 @@ wait
         async with aiofiles.tempfile.NamedTemporaryFile(
             dir=self.cache_dir
         ) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
-
             # Write the function to file
             app_log.debug("Writing function, args, kwargs to file...")
             await temp_f.write(pickle.dumps((function, args, kwargs)))
@@ -485,7 +483,6 @@ wait
             return result
 
     async def teardown(self, task_metadata: Dict):
-
         if self.cleanup:
             app_log.debug("Performing cleanup on remote...")
             _, conn = await self._client_connect()

@@ -247,7 +247,6 @@ async def test_query_result(mocker, proc_mock, conn_mock):
             return unpatched_open(*args, **kwargs)
 
     with mock.patch("aiofiles.threadpool.sync_open", mock_open):
-
         result, stdout, stderr, exception = await executor._query_result(
             result_filename="mock_result", task_results_dir="", conn=conn_mock
         )
