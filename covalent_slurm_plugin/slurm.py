@@ -64,7 +64,9 @@ class SlurmExecutor(AsyncBaseExecutor):
     Args:
         username: Username used to authenticate over SSH.
         address: Remote address or hostname of the Slurm login node.
-        ssh_key_file: Private RSA key used to authenticate over SSH.
+        ssh_key_file: Private RSA key used to authenticate over SSH if a string is passed.
+            A tuple or list of strings can also be passed in accordance with the client_keys
+            kwarg of the asyncssh.connect function.
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function.
@@ -78,7 +80,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         self,
         username: str,
         address: str,
-        ssh_key_file: str,
+        ssh_key_file: str | Tuple[str, str] | List[str] = None,
         remote_workdir: str = "covalent-workdir",
         slurm_path: str = None,
         conda_env: str = None,
@@ -94,7 +96,11 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.address = address
 
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
-        self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
+
+        if isinstance(ssh_key_file, str):
+            ssh_key_file = [ssh_key_file]
+
+        self.ssh_key_file = [str(Path(f).expanduser().resolve()) for f in ssh_key_file]
 
         self.remote_workdir = remote_workdir
         self.slurm_path = slurm_path
@@ -126,19 +132,20 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         ssh_success = False
         conn = None
-        if os.path.exists(self.ssh_key_file):
-            conn = await asyncssh.connect(
-                self.address,
-                username=self.username,
-                client_keys=[self.ssh_key_file],
-                known_hosts=None,
-            )
 
-            ssh_success = True
+        for f in self.ssh_key_file:
+            if not os.path.exists(f):
+                message = f"No SSH key file found at {f}. Cannot connect to host."
+                raise RuntimeError(message)
 
-        else:
-            message = f"No SSH key file found at {self.ssh_key_file}. Cannot connect to host."
-            raise RuntimeError(message)
+        conn = await asyncssh.connect(
+            self.address,
+            username=self.username,
+            client_keys=self.ssh_key_file,
+            known_hosts=None,
+        )
+
+        ssh_success = True
 
         return ssh_success, conn
 
