@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Operations
 
-- Added a new kwarg, `certificate_file`, to `SlurmExecutor` that allows for a certificate file to be passed.
+- Added a new kwarg, `cert_file`, to `SlurmExecutor` that allows for a certificate file to be passed.
 - Added Alejandro to paul blart group
 
 ## [0.8.0] - 2022-11-19
