@@ -96,17 +96,17 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.username = username
         self.address = address
 
-        ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
-        cert_file = cert_file or get_config("executors.slurm.cert_file")
+        self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
+        self.cert_file = cert_file or get_config("executors.slurm.cert_file")
 
-        self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
+        self.ssh_key_file = str(Path(self.ssh_key_file).expanduser().resolve())
 
-        if cert_file:
-            self.cert_file = str(Path(cert_file).expanduser().resolve())
+        if self.cert_file:
+            self.cert_file = str(Path(self.cert_file).expanduser().resolve())
 
         if not os.path.exists(self.ssh_key_file):
             raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
-        if cert_file and not os.path.exists(self.cert_file):
+        if self.cert_file and not os.path.exists(self.cert_file):
             raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
 
         self.remote_workdir = remote_workdir
