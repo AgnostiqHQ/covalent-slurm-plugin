@@ -100,10 +100,8 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.certificate_file = str(Path(certificate_file).expanduser().resolve())
 
         if certificate_file:
-            # Note: It's a tuple of form (private_key, certificate)
-            self.client_keys = (self.ssh_key_file, self.certificate_file)
+            self.client_keys = [(self.ssh_key_file, self.certificate_file)]
         else:
-            # Note: It's a list of private keys
             self.client_keys = [self.ssh_key_file]
 
         self.remote_workdir = remote_workdir
