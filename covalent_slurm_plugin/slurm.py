@@ -80,7 +80,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         self,
         username: str,
         address: str,
-        ssh_key_file: str | Tuple[str, str] | List[str] = None,
+        ssh_key_file: Union[str, Tuple[str, str], List[str]] = None,
         remote_workdir: str = "covalent-workdir",
         slurm_path: str = None,
         conda_env: str = None,
