@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added a new kwarg, `cert_file`, to `SlurmExecutor` that allows for a certificate file to be passed.
 
+### Changed
+
+- Changed the `_client_connect` function to output the connection object only since the first positional argument cannot get used.
+
 ## [0.8.0] - 2022-11-19
 
 ### Operations
