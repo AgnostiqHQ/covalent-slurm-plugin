@@ -99,7 +99,10 @@ class SlurmExecutor(AsyncBaseExecutor):
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
 
-        cert_file = cert_file or get_config("executors.slurm.cert_file")
+        # NOTE: Line below should be uncommented but all the _EXECUTOR_PLUGIN_DEFAULTS
+        # key/value pairs with values of `None` do not appear in ct.get_config(),
+        # including but not limited to "cert_file".
+        # cert_file = cert_file or get_config("executors.slurm.cert_file")
         if cert_file:
             self.cert_file = str(Path(cert_file).expanduser().resolve())
         else:
