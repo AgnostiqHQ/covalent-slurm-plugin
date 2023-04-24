@@ -44,6 +44,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "username": "",
     "address": "",
     "ssh_key_file": "",
+    "cert_file": None,
     "remote_workdir": "covalent-workdir",
     "slurm_path": None,
     "conda_env": None,
@@ -65,7 +66,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         username: Username used to authenticate over SSH.
         address: Remote address or hostname of the Slurm login node.
         ssh_key_file: Private RSA key used to authenticate over SSH if a string is passed.
-        certificate_file: Certificate file used to authenticate over SSH, if required.
+        cert_file: Certificate file used to authenticate over SSH, if required.
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function.
@@ -80,7 +81,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         username: str,
         address: str,
         ssh_key_file: str,
-        certificate_file: str = None,
+        cert_file: str = None,
         remote_workdir: str = "covalent-workdir",
         slurm_path: str = None,
         conda_env: str = None,
@@ -96,11 +97,13 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.address = address
 
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
-        self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
-        self.certificate_file = str(Path(certificate_file).expanduser().resolve())
+        cert_file = cert_file or get_config("executors.slurm.cert_file")
 
-        if certificate_file:
-            self.client_keys = [(self.ssh_key_file, self.certificate_file)]
+        self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
+        self.cert_file = str(Path(cert_file).expanduser().resolve())
+
+        if self.cert_file:
+            self.client_keys = [(self.ssh_key_file, self.cert_file)]
         else:
             self.client_keys = [self.ssh_key_file]
 
@@ -129,27 +132,23 @@ class SlurmExecutor(AsyncBaseExecutor):
             None
 
         Returns:
-            True if connection to the remote host was successful, False otherwise.
+            The connection object
         """
 
-        ssh_success = False
-        conn = None
+        try:
+            conn = await asyncssh.connect(
+                self.address,
+                username=self.username,
+                client_keys=self.client_keys,
+                known_hosts=None,
+            )
 
-        for f in self.client_keys:
-            if not os.path.exists(f):
-                message = f"No file found at {f}. Cannot connect to host."
-                raise RuntimeError(message)
+        except:
+            raise RuntimeError(
+                f"Could not connect to host: '{self.address}' as user: '{self.username}'"
+            )
 
-        conn = await asyncssh.connect(
-            self.address,
-            username=self.username,
-            client_keys=self.client_keys,
-            known_hosts=None,
-        )
-
-        ssh_success = True
-
-        return ssh_success, conn
+        return conn
 
     async def perform_cleanup(
         self,
@@ -388,12 +387,7 @@ wait
 
         result = None
 
-        ssh_success, conn = await self._client_connect()
-
-        if not ssh_success:
-            raise RuntimeError(
-                f"Could not connect to host: '{self.address}' as user: '{self.username}'"
-            )
+        conn = await self._client_connect()
 
         async with aiofiles.tempfile.NamedTemporaryFile(
             dir=self.cache_dir
@@ -494,7 +488,7 @@ wait
     async def teardown(self, task_metadata: Dict):
         if self.cleanup:
             app_log.debug("Performing cleanup on remote...")
-            _, conn = await self._client_connect()
+            conn = await self._client_connect()
             await self.perform_cleanup(
                 conn=conn,
                 remote_func_filename=self._remote_func_filename,
