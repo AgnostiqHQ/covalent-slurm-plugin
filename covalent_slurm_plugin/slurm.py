@@ -100,12 +100,14 @@ class SlurmExecutor(AsyncBaseExecutor):
         cert_file = cert_file or get_config("executors.slurm.cert_file")
 
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
-        self.cert_file = str(Path(cert_file).expanduser().resolve())
 
-        if self.cert_file:
-            self.client_keys = [(self.ssh_key_file, self.cert_file)]
-        else:
-            self.client_keys = [self.ssh_key_file]
+        if cert_file:
+            self.cert_file = str(Path(cert_file).expanduser().resolve())
+
+        if not os.path.exists(self.ssh_key_file):
+            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
+        if cert_file and not os.path.exists(self.cert_file):
+            raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
 
         self.remote_workdir = remote_workdir
         self.slurm_path = slurm_path
@@ -135,11 +137,21 @@ class SlurmExecutor(AsyncBaseExecutor):
             The connection object
         """
 
+        if self.cert_file:
+            client_keys = [
+                (
+                    asyncssh.read_private_key(self.ssh_key_file),
+                    asyncssh.read_certificate(self.cert_file),
+                )
+            ]
+        else:
+            client_keys = [asyncssh.read_private_key(self.ssh_key_file)]
+
         try:
             conn = await asyncssh.connect(
                 self.address,
                 username=self.username,
-                client_keys=self.client_keys,
+                client_keys=client_keys,
                 known_hosts=None,
             )
 
