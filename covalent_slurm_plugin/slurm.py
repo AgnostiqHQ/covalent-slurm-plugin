@@ -155,9 +155,9 @@ class SlurmExecutor(AsyncBaseExecutor):
                 known_hosts=None,
             )
 
-        except:
+        except Exception as e:
             raise RuntimeError(
-                f"Could not connect to host: '{self.address}' as user: '{self.username}'"
+                f"Could not connect to host: '{self.address}' as user: '{self.username}'",e
             )
 
         return conn
