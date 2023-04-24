@@ -113,8 +113,8 @@ class SlurmExecutor(AsyncBaseExecutor):
         if self.cert_file and not os.path.exists(self.cert_file):
             raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
 
-        self.remote_workdir = remote_workdir
-        self.slurm_path = slurm_path
+        self.remote_workdir = str(Path(remote_workdir).expanduser().resolve())
+        self.slurm_path = str(Path(slurm_path).expanduser().resolve())
         self.conda_env = conda_env
 
         cache_dir = cache_dir or get_config("dispatcher.cache_dir")
