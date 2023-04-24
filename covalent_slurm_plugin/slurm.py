@@ -101,7 +101,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         cert_file = cert_file or get_config("executors.slurm.cert_file")
         if cert_file:
-            self.cert_file = str(Path(self.cert_file).expanduser().resolve())
+            self.cert_file = str(Path(cert_file).expanduser().resolve())
         else:
             self.cert_file = cert_file
 
