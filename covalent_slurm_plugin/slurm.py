@@ -98,23 +98,18 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
+        if not os.path.exists(self.ssh_key_file):
+            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
 
-        # NOTE: Line below should be uncommented but all the _EXECUTOR_PLUGIN_DEFAULTS
-        # key/value pairs with values of `None` do not appear in ct.get_config(),
-        # including but not limited to "cert_file".
-        # cert_file = cert_file or get_config("executors.slurm.cert_file")
         if cert_file:
             self.cert_file = str(Path(cert_file).expanduser().resolve())
         else:
             self.cert_file = cert_file
-
-        if not os.path.exists(self.ssh_key_file):
-            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
         if self.cert_file and not os.path.exists(self.cert_file):
             raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
 
         self.remote_workdir = str(Path(remote_workdir).expanduser().resolve())
-        self.slurm_path = str(Path(slurm_path).expanduser().resolve())
+        self.slurm_path = slurm_path
         self.conda_env = conda_env
 
         cache_dir = cache_dir or get_config("dispatcher.cache_dir")
