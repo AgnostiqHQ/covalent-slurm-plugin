@@ -65,7 +65,7 @@ class SlurmExecutor(AsyncBaseExecutor):
     Args:
         username: Username used to authenticate over SSH.
         address: Remote address or hostname of the Slurm login node.
-        ssh_key_file: Private RSA key used to authenticate over SSH if a string is passed.
+        ssh_key_file: Private RSA key used to authenticate over SSH.
         cert_file: Certificate file used to authenticate over SSH, if required.
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
