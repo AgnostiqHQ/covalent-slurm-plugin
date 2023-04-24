@@ -65,8 +65,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         username: Username used to authenticate over SSH.
         address: Remote address or hostname of the Slurm login node.
         ssh_key_file: Private RSA key used to authenticate over SSH if a string is passed.
-            A tuple or list of strings can also be passed in accordance with the client_keys
-            kwarg of the asyncssh.connect function.
+        certificate_file: Certificate file used to authenticate over SSH, if required.
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function.
@@ -80,7 +79,8 @@ class SlurmExecutor(AsyncBaseExecutor):
         self,
         username: str,
         address: str,
-        ssh_key_file: Union[str, Tuple[str, str], List[str]] = None,
+        ssh_key_file: str,
+        certificate_file: str = None,
         remote_workdir: str = "covalent-workdir",
         slurm_path: str = None,
         conda_env: str = None,
@@ -96,17 +96,14 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.address = address
 
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
-        ssh_key_file_type = type(ssh_key_file)
+        self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
+        self.certificate_file = str(Path(certificate_file).expanduser().resolve())
 
-        if isinstance(ssh_key_file, str):
-            ssh_key_file = [ssh_key_file]
+        if certificate_file:
+            self.client_keys = [ssh_key_file, certificate_file]
+        else:
+            self.client_keys = [ssh_key_file]
 
-        ssh_key_file = [str(Path(f).expanduser().resolve()) for f in ssh_key_file]
-
-        if ssh_key_file_type is tuple:
-            ssh_key_file = tuple(ssh_key_file)
-
-        self.ssh_key_file = ssh_key_file
         self.remote_workdir = remote_workdir
         self.slurm_path = slurm_path
         self.conda_env = conda_env
@@ -138,15 +135,15 @@ class SlurmExecutor(AsyncBaseExecutor):
         ssh_success = False
         conn = None
 
-        for f in self.ssh_key_file:
+        for f in self.client_keys:
             if not os.path.exists(f):
-                message = f"No SSH key file found at {f}. Cannot connect to host."
+                message = f"No file found at {f}. Cannot connect to host."
                 raise RuntimeError(message)
 
         conn = await asyncssh.connect(
             self.address,
             username=self.username,
-            client_keys=self.ssh_key_file,
+            client_keys=self.client_keys,
             known_hosts=None,
         )
 
