@@ -134,6 +134,33 @@ def test_format_submit_script():
         assert False, f"Exception while running _format_submit_script: {exc}"
 
 
+def test_failed_submit_script():
+    "Test for expected errors"
+
+    with pytest.raises(FileNotFoundError):
+        SlurmExecutor(
+            username="test_user",
+            address="test_address",
+            ssh_key_file="/this/file/does/not/exists",
+            remote_workdir="/federation/test_user/.cache/covalent",
+            poll_freq=30,
+            cache_dir="~/.cache/covalent",
+            options={},
+        )
+
+    with pytest.raises(FileNotFoundError):
+        SlurmExecutor(
+            username="test_user",
+            address="test_address",
+            ssh_key_file=SSH_KEY_FILE,
+            cert_file="/this/file/does/not/exists",
+            remote_workdir="/federation/test_user/.cache/covalent",
+            poll_freq=30,
+            cache_dir="~/.cache/covalent",
+            options={},
+        )
+
+
 @pytest.mark.asyncio
 async def test_get_status(proc_mock, conn_mock):
     """Test the get_status method."""
