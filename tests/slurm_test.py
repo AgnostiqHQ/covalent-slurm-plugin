@@ -37,6 +37,10 @@ aiofiles.threadpool.wrap.register(mock.MagicMock)(
     lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs)
 )
 
+FILE_DIR = Path(__file__).resolve().parent
+SSH_KEY_FILE = os.path.join(FILE_DIR, "id_rsa")
+CERT_FILE = os.path.join(FILE_DIR, "id_rsa.pub")
+
 
 @pytest.fixture
 def proc_mock():
@@ -48,12 +52,26 @@ def conn_mock():
     return mock.Mock()
 
 
+def setup_module():
+    """Setup the module."""
+    for f in [SSH_KEY_FILE, CERT_FILE]:
+        with open(f, "w") as f:
+            f.write("test_file")
+
+
+def teardown_module():
+    """Teardown the module."""
+    for f in [SSH_KEY_FILE, CERT_FILE]:
+        if os.path.exists(f):
+            os.remove(f)
+
+
 def test_init():
     """Test that initialization properly sets member variables."""
 
     username = "username"
     host = "host"
-    key_file = "key_file"
+    key_file = SSH_KEY_FILE
     remote_workdir = "/test/remote/workdir"
     slurm_path = "/opt/test/slurm/path"
     cache_dir = "/test/cache/dir"
@@ -86,7 +104,7 @@ def test_format_submit_script():
     executor = SlurmExecutor(
         username="test_user",
         address="test_address",
-        ssh_key_file="~/.ssh/id_rsa",
+        ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
         cache_dir="~/.cache/covalent",
@@ -123,7 +141,7 @@ async def test_get_status(proc_mock, conn_mock):
     executor = SlurmExecutor(
         username="test_user",
         address="test_address",
-        ssh_key_file="~/.ssh/id_rsa",
+        ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
         cache_dir="~/.cache/covalent",
@@ -151,7 +169,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
     executor = SlurmExecutor(
         username="test_user",
         address="test_address",
-        ssh_key_file="~/.ssh/id_rsa",
+        ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
         cache_dir="~/.cache/covalent",
@@ -192,7 +210,7 @@ async def test_query_result(mocker, proc_mock, conn_mock):
     executor = SlurmExecutor(
         username="test_user",
         address="test_address",
-        ssh_key_file="~/.ssh/id_rsa",
+        ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
         cache_dir="~/.cache/covalent",
@@ -247,7 +265,6 @@ async def test_query_result(mocker, proc_mock, conn_mock):
             return unpatched_open(*args, **kwargs)
 
     with mock.patch("aiofiles.threadpool.sync_open", mock_open):
-
         result, stdout, stderr, exception = await executor._query_result(
             result_filename="mock_result", task_results_dir="", conn=conn_mock
         )
