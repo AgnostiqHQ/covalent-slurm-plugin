@@ -105,6 +105,7 @@ def test_format_submit_script():
         username="test_user",
         address="test_address",
         ssh_key_file=SSH_KEY_FILE,
+        cert_file=CERT_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
         cache_dir="~/.cache/covalent",
