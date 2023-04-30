@@ -28,6 +28,7 @@ from unittest import mock
 import aiofiles
 import pytest
 from covalent._results_manager.result import Result
+from covalent._shared_files.config import get_config
 from covalent._workflow.transport import TransportableObject
 from covalent.executor.base import wrapper_fn
 
@@ -69,30 +70,57 @@ def teardown_module():
 def test_init():
     """Test that initialization properly sets member variables."""
 
+    # Test with defaults
     username = "username"
     host = "host"
     key_file = SSH_KEY_FILE
+    executor = SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+
+    assert executor.username == username
+    assert executor.address == host
+    assert executor.ssh_key_file == SSH_KEY_FILE
+    assert executor.cert_file == None
+    assert executor.remote_workdir == "covalent-workdir"
+    assert executor.slurm_path == None
+    assert executor.conda_env == None
+    assert executor.poll_freq == 30
+    assert executor.cache_dir == str(
+        Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
+    )
+    assert executor.options == {"parsable": ""}
+
+    # Test with non-defaults
+    username = "username"
+    host = "host"
+    key_file = SSH_KEY_FILE
+    cert_file = CERT_FILE
     remote_workdir = "/test/remote/workdir"
     slurm_path = "/opt/test/slurm/path"
+    conda_env = "test_env"
+    poll_freq = 60
     cache_dir = "/test/cache/dir"
 
     executor = SlurmExecutor(
         username=username,
         address=host,
         ssh_key_file=key_file,
+        cert_file=cert_file,
         remote_workdir=remote_workdir,
         slurm_path=slurm_path,
-        poll_freq=30,
+        conda_env=conda_env,
+        poll_freq=poll_freq,
         cache_dir=cache_dir,
         options={},
     )
 
     assert executor.username == username
     assert executor.address == host
-    assert executor.ssh_key_file == str(Path(key_file).expanduser().resolve())
+    assert executor.ssh_key_file == SSH_KEY_FILE
+    assert executor.cert_file == CERT_FILE
     assert executor.remote_workdir == remote_workdir
     assert executor.slurm_path == slurm_path
-    assert executor.poll_freq == 30
+    assert executor.conda_env == conda_env
+    assert executor.poll_freq == poll_freq
     assert executor.cache_dir == cache_dir
     assert executor.options == {}
 
