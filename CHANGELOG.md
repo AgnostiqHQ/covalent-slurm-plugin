@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.9.0] - 2023-04-30
+
 ### Added
 
 - Added a new kwarg, `cert_file`, to `SlurmExecutor` that allows for a certificate file to be passed.
