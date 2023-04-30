@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+
+- Added a new kwarg, `cert_file`, to `SlurmExecutor` that allows for a certificate file to be passed.
+
+### Changed
+
+- Changed the `_client_connect` function to output the connection object only since the first positional argument cannot get used.
+
 ### Operations
 
 - Added Alejandro to paul blart group

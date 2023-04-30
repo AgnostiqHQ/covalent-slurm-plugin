@@ -44,6 +44,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "username": "",
     "address": "",
     "ssh_key_file": "",
+    "cert_file": None,
     "remote_workdir": "covalent-workdir",
     "slurm_path": None,
     "conda_env": None,
@@ -65,6 +66,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         username: Username used to authenticate over SSH.
         address: Remote address or hostname of the Slurm login node.
         ssh_key_file: Private RSA key used to authenticate over SSH.
+        cert_file: Certificate file used to authenticate over SSH, if required.
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function.
@@ -79,6 +81,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         username: str,
         address: str,
         ssh_key_file: str,
+        cert_file: str = None,
         remote_workdir: str = "covalent-workdir",
         slurm_path: str = None,
         conda_env: str = None,
@@ -95,6 +98,15 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
+        if not os.path.exists(self.ssh_key_file):
+            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
+
+        if cert_file:
+            self.cert_file = str(Path(cert_file).expanduser().resolve())
+        else:
+            self.cert_file = cert_file
+        if self.cert_file and not os.path.exists(self.cert_file):
+            raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
 
         self.remote_workdir = remote_workdir
         self.slurm_path = slurm_path
@@ -121,26 +133,33 @@ class SlurmExecutor(AsyncBaseExecutor):
             None
 
         Returns:
-            True if connection to the remote host was successful, False otherwise.
+            The connection object
         """
 
-        ssh_success = False
-        conn = None
-        if os.path.exists(self.ssh_key_file):
+        if self.cert_file:
+            client_keys = [
+                (
+                    asyncssh.read_private_key(self.ssh_key_file),
+                    asyncssh.read_certificate(self.cert_file),
+                )
+            ]
+        else:
+            client_keys = [asyncssh.read_private_key(self.ssh_key_file)]
+
+        try:
             conn = await asyncssh.connect(
                 self.address,
                 username=self.username,
-                client_keys=[self.ssh_key_file],
+                client_keys=client_keys,
                 known_hosts=None,
             )
 
-            ssh_success = True
+        except Exception as e:
+            raise RuntimeError(
+                f"Could not connect to host: '{self.address}' as user: '{self.username}'", e
+            )
 
-        else:
-            message = f"No SSH key file found at {self.ssh_key_file}. Cannot connect to host."
-            raise RuntimeError(message)
-
-        return ssh_success, conn
+        return conn
 
     async def perform_cleanup(
         self,
@@ -360,7 +379,6 @@ wait
         return result, stdout, stderr, exception
 
     async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
-
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
         results_dir = task_metadata["results_dir"]
@@ -380,17 +398,11 @@ wait
 
         result = None
 
-        ssh_success, conn = await self._client_connect()
-
-        if not ssh_success:
-            raise RuntimeError(
-                f"Could not connect to host: '{self.address}' as user: '{self.username}'"
-            )
+        conn = await self._client_connect()
 
         async with aiofiles.tempfile.NamedTemporaryFile(
             dir=self.cache_dir
         ) as temp_f, aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
-
             # Write the function to file
             app_log.debug("Writing function, args, kwargs to file...")
             await temp_f.write(pickle.dumps((function, args, kwargs)))
@@ -485,10 +497,9 @@ wait
             return result
 
     async def teardown(self, task_metadata: Dict):
-
         if self.cleanup:
             app_log.debug("Performing cleanup on remote...")
-            _, conn = await self._client_connect()
+            conn = await self._client_connect()
             await self.perform_cleanup(
                 conn=conn,
                 remote_func_filename=self._remote_func_filename,
