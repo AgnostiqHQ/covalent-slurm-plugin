@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+
+- Modified executor to use `srun` in slurm script, instead of injecting python code and calling python directly.
+- Added new parameters to `SlurmExecutor` to allow finer control of jobs via options for `srun` and in-script commands (see README.md).
+- Added `srun_append` parameter allowing insertion of intermediate command (see README.md).
+- Added `prerun_commands` and `postrun_commands` parameters allowing execution of in-script shell commands before and after the workflow submission via `srun` (see README.md).
+
 ## [0.9.0] - 2023-04-30
 
 ### Added
