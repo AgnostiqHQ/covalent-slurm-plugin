@@ -25,7 +25,7 @@ import os
 import re
 import sys
 from copy import deepcopy
-from datetime import datetime, strptime
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple, Union
 
@@ -53,7 +53,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "options": {
         "parsable": "",
     },
-    "poll_freq": 30,
+    "poll_freq": 60,
     "cleanup": True,
 }
 
@@ -149,13 +149,14 @@ class SlurmExecutor(AsyncBaseExecutor):
             The connection object
         """
 
-        if self.sshproxy:
+        if self.sshproxy and self.address in self.sshproxy["hosts"]:
             try:
                 import oathtool
             except ImportError:
                 raise RuntimeError(
                     "To use 'sshproxy' options, reinstall the Slurm plugin as 'pip install covalent-slurm-plugin[sshproxy]'"
                 )
+            app_log.debug("SSHProxy is active")
 
             # Validate the certificate is not expired
             valid_cert = False
@@ -172,14 +173,19 @@ class SlurmExecutor(AsyncBaseExecutor):
                         "Failed to identify the expiration of the SSH key. Is this key compatible with sshproxy?"
                     )
 
-                expiration = strptime(stdout.decode(), "%Y-%m-%dT%h:%m:%s")
+                print(stdout.decode())
+                expiration = datetime.strptime(stdout.decode().rstrip(), "%Y-%m-%dT%H:%M:%S")
+                # expiration = datetime.fromisoformat(stdout.decode())
                 if expiration > datetime.now():
                     valid_cert = True
+                    print("SSHProxy is not needed!")
+
+                app_log.debug(f"Certificate expiration: {stdout.decode()}")
 
             if not valid_cert:
-                password = get_config("slurm.sshproxy.password")
-                otp = oathtool.generate_otp(get_config("slurm.sshproxy.secret"))
-                passphrase = f"{password}{otp}"
+                app_log.debug("Requesting new key and certificate")
+                password = self.sshproxy["password"]
+                otp = oathtool.generate_otp(self.sshproxy["secret"])
 
                 proc = await asyncio.create_subprocess_shell(
                     f'echo "{password}{otp}" | sshproxy -u {self.username} -o {self.ssh_key_file}',
@@ -190,6 +196,8 @@ class SlurmExecutor(AsyncBaseExecutor):
 
                 if proc.returncode != 0:
                     raise RuntimeError(f"sshproxy failed to retrieve a key: {stderr.decode()}")
+
+                app_log.debug("sshproxy successful")
 
         if self.cert_file:
             client_keys = [
