@@ -137,7 +137,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         self.LOAD_SLURM_PREFIX = "source /etc/profile\n module whatis slurm &> /dev/null\n if [ $? -eq 0 ] ; then\n module load slurm\n fi\n"
 
-    async def _client_connect(self) -> Tuple[bool, asyncssh.SSHClientConnection]:
+    async def _client_connect(self) -> asyncssh.SSHClientConnection:
         """
         Helper function for connecting to the remote host through asyncssh module.
 

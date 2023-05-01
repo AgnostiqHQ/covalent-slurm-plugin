@@ -465,10 +465,10 @@ async def test_run(mocker, proc_mock, conn_mock):
         proc_mock.returncode = 0
 
     async def __client_connect_fail(*_):
-        return False, conn_mock
+        return conn_mock
 
     async def __client_connect_succeed(*_):
-        return True, conn_mock
+        return conn_mock
 
     async def __poll_slurm_succeed(*_):
         return
@@ -600,7 +600,7 @@ async def test_teardown(mocker, proc_mock, conn_mock):
     conn_mock.wait_closed = mock.AsyncMock(return_value=None)
 
     async def __client_connect_succeed(*_):
-        return True, conn_mock
+        return conn_mock
 
     async def __query_result_succeed(*_):
         return "result", "", "", None
