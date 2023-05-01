@@ -113,10 +113,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
 
-        if cert_file:
-            self.cert_file = str(Path(cert_file).expanduser().resolve())
-        else:
-            self.cert_file = cert_file
+        self.cert_file = str(Path(cert_file).expanduser().resolve()) if cert_file else None
 
         self.remote_workdir = remote_workdir
         self.slurm_path = slurm_path

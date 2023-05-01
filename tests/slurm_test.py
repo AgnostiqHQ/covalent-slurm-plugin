@@ -238,31 +238,36 @@ def test_format_submit_script():
         assert False, f"Exception while running _format_submit_script: {exc}"
 
 
-def test_failed_submit_script():
+@pytest.mark.asyncio
+async def test_failed_submit_script(mocker, conn_mock):
     "Test for expected errors"
 
+    mocker.patch("asyncssh.connect", return_value=conn_mock)
+
     with pytest.raises(FileNotFoundError):
-        SlurmExecutor(
+        executor = SlurmExecutor(
             username="test_user",
             address="test_address",
-            ssh_key_file="/this/file/does/not/exists",
+            ssh_key_file="/this/file/does/not/exist",
             remote_workdir="/federation/test_user/.cache/covalent",
             poll_freq=30,
             cache_dir="~/.cache/covalent",
             options={},
         )
+        await executor._client_connect()
 
     with pytest.raises(FileNotFoundError):
-        SlurmExecutor(
+        executor = SlurmExecutor(
             username="test_user",
             address="test_address",
             ssh_key_file=SSH_KEY_FILE,
-            cert_file="/this/file/does/not/exists",
+            cert_file="/this/file/does/not/exist",
             remote_workdir="/federation/test_user/.cache/covalent",
             poll_freq=30,
             cache_dir="~/.cache/covalent",
             options={},
         )
+        await executor._client_connect()
 
 
 @pytest.mark.asyncio
@@ -486,8 +491,8 @@ async def test_run(mocker, proc_mock, conn_mock):
         msg = f"Could not connect to host: '{executor.address}' as user: '{executor.username}'"
         with pytest.raises(Exception) as exc_info:
             await executor.run(*dummy_args)
-        assert exc_info.type is RuntimeError
-        assert exc_info.value.args == (msg,)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == (msg,)
 
     # check failed creation of remote directory  handled as expected
     msg = "Failed to create directory"
@@ -495,8 +500,8 @@ async def test_run(mocker, proc_mock, conn_mock):
     with patch_ccs:
         with pytest.raises(Exception) as exc_info:
             await executor.run(*dummy_args)
-        assert exc_info.type is RuntimeError
-        assert exc_info.value.args == (msg,)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == (msg,)
     reset_proc_mock()
 
     # check run call completes with no other errors when `slurm_path` specified
@@ -515,8 +520,8 @@ async def test_run(mocker, proc_mock, conn_mock):
         mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
         with pytest.raises(Exception) as exc_info:
             await executor.run(*dummy_args)
-        assert exc_info.type is RuntimeError
-        assert exc_info.value.args == (msg,)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == (msg,)
     reset_proc_mock()
 
     # check failed `cmd_sbatch` run on remote handled as expected
@@ -526,8 +531,8 @@ async def test_run(mocker, proc_mock, conn_mock):
         mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
         with pytest.raises(Exception) as exc_info:
             await executor.run(*dummy_args)
-        assert exc_info.type is RuntimeError
-        assert exc_info.value.args == ("",)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == ("",)
     executor.slurm_path = None
     reset_proc_mock()
 
@@ -537,8 +542,8 @@ async def test_run(mocker, proc_mock, conn_mock):
         mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
         with pytest.raises(Exception) as exc_info:
             await executor.run(*dummy_args)
-        assert exc_info.type is RuntimeError
-        assert exc_info.value.args == (dummy_error_msg,)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == (dummy_error_msg,)
     reset_proc_mock()
 
     # check run call completes with no other errors
