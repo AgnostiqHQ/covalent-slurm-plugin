@@ -112,15 +112,11 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
-        if not os.path.exists(self.ssh_key_file):
-            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
 
         if cert_file:
             self.cert_file = str(Path(cert_file).expanduser().resolve())
         else:
             self.cert_file = cert_file
-        if self.cert_file and not os.path.exists(self.cert_file):
-            raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
 
         self.remote_workdir = remote_workdir
         self.slurm_path = slurm_path
@@ -156,6 +152,12 @@ class SlurmExecutor(AsyncBaseExecutor):
         Returns:
             The connection object
         """
+
+        if self.cert_file and not os.path.exists(self.cert_file):
+            raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
+
+        if not os.path.exists(self.ssh_key_file):
+            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
 
         if self.cert_file:
             client_keys = [
