@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `srun_append` parameter allowing insertion of intermediate command (see README.md).
 - Added `prerun_commands` and `postrun_commands` parameters allowing execution of in-script shell commands before and after the workflow submission via `srun` (see README.md).
 
+## [0.9.0] - 2023-04-30
+
+### Added
+
+- Added a new kwarg, `cert_file`, to `SlurmExecutor` that allows for a certificate file to be passed.
+
+### Changed
+
+- Changed the `_client_connect` function to output the connection object only since the first positional argument cannot get used.
+
 ### Operations
 
 - Added Alejandro to paul blart group

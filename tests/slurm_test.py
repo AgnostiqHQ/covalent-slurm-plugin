@@ -20,6 +20,7 @@
 
 """Tests for the SLURM executor plugin."""
 
+import os
 from functools import partial
 from pathlib import Path
 from unittest import mock
@@ -27,6 +28,7 @@ from unittest import mock
 import aiofiles
 import pytest
 from covalent._results_manager.result import Result
+from covalent._shared_files.config import get_config
 from covalent._workflow.transport import TransportableObject
 from covalent.executor.base import wrapper_fn
 
@@ -35,6 +37,10 @@ from covalent_slurm_plugin import SlurmExecutor
 aiofiles.threadpool.wrap.register(mock.MagicMock)(
     lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs)
 )
+
+FILE_DIR = Path(__file__).resolve().parent
+SSH_KEY_FILE = os.path.join(FILE_DIR, "id_rsa")
+CERT_FILE = os.path.join(FILE_DIR, "id_rsa.pub")
 
 
 @pytest.fixture
@@ -47,33 +53,74 @@ def conn_mock():
     return mock.Mock()
 
 
+def setup_module():
+    """Setup the module."""
+    for f in [SSH_KEY_FILE, CERT_FILE]:
+        with open(f, "w") as f:
+            f.write("test_file")
+
+
+def teardown_module():
+    """Teardown the module."""
+    for f in [SSH_KEY_FILE, CERT_FILE]:
+        if os.path.exists(f):
+            os.remove(f)
+
+
 def test_init():
     """Test that initialization properly sets member variables."""
 
+    # Test with defaults
     username = "username"
     host = "host"
-    key_file = "key_file"
+    key_file = SSH_KEY_FILE
+    executor = SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+
+    assert executor.username == username
+    assert executor.address == host
+    assert executor.ssh_key_file == SSH_KEY_FILE
+    assert executor.cert_file is None
+    assert executor.remote_workdir == "covalent-workdir"
+    assert executor.slurm_path is None
+    assert executor.conda_env is None
+    assert executor.poll_freq == 30
+    assert executor.cache_dir == str(
+        Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
+    )
+    assert executor.options == {"parsable": ""}
+
+    # Test with non-defaults
+    username = "username"
+    host = "host"
+    key_file = SSH_KEY_FILE
+    cert_file = CERT_FILE
     remote_workdir = "/test/remote/workdir"
     slurm_path = "/opt/test/slurm/path"
+    conda_env = "test_env"
+    poll_freq = 60
     cache_dir = "/test/cache/dir"
 
     executor = SlurmExecutor(
         username=username,
         address=host,
         ssh_key_file=key_file,
+        cert_file=cert_file,
         remote_workdir=remote_workdir,
         slurm_path=slurm_path,
-        poll_freq=30,
+        conda_env=conda_env,
+        poll_freq=poll_freq,
         cache_dir=cache_dir,
         options={},
     )
 
     assert executor.username == username
     assert executor.address == host
-    assert executor.ssh_key_file == str(Path(key_file).expanduser().resolve())
+    assert executor.ssh_key_file == SSH_KEY_FILE
+    assert executor.cert_file == CERT_FILE
     assert executor.remote_workdir == remote_workdir
     assert executor.slurm_path == slurm_path
-    assert executor.poll_freq == 30
+    assert executor.conda_env == conda_env
+    assert executor.poll_freq == poll_freq
     assert executor.cache_dir == cache_dir
     assert executor.options == {}
 
@@ -85,7 +132,8 @@ def test_format_py_script():
     executor_0 = SlurmExecutor(
         username="test_user",
         address="test_address",
-        ssh_key_file="~/.ssh/id_rsa",
+        ssh_key_file=SSH_KEY_FILE,
+        cert_file=CERT_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
         cache_dir="~/.cache/covalent",
@@ -190,6 +238,33 @@ def test_format_submit_script():
         assert False, f"Exception while running _format_submit_script: {exc}"
 
 
+def test_failed_submit_script():
+    "Test for expected errors"
+
+    with pytest.raises(FileNotFoundError):
+        SlurmExecutor(
+            username="test_user",
+            address="test_address",
+            ssh_key_file="/this/file/does/not/exists",
+            remote_workdir="/federation/test_user/.cache/covalent",
+            poll_freq=30,
+            cache_dir="~/.cache/covalent",
+            options={},
+        )
+
+    with pytest.raises(FileNotFoundError):
+        SlurmExecutor(
+            username="test_user",
+            address="test_address",
+            ssh_key_file=SSH_KEY_FILE,
+            cert_file="/this/file/does/not/exists",
+            remote_workdir="/federation/test_user/.cache/covalent",
+            poll_freq=30,
+            cache_dir="~/.cache/covalent",
+            options={},
+        )
+
+
 @pytest.mark.asyncio
 async def test_get_status(proc_mock, conn_mock):
     """Test the get_status method."""
@@ -197,7 +272,7 @@ async def test_get_status(proc_mock, conn_mock):
     executor = SlurmExecutor(
         username="test_user",
         address="test_address",
-        ssh_key_file="~/.ssh/id_rsa",
+        ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
         cache_dir="~/.cache/covalent",
@@ -225,7 +300,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
     executor = SlurmExecutor(
         username="test_user",
         address="test_address",
-        ssh_key_file="~/.ssh/id_rsa",
+        ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
         cache_dir="~/.cache/covalent",
@@ -266,7 +341,7 @@ async def test_query_result(mocker, proc_mock, conn_mock):
     executor = SlurmExecutor(
         username="test_user",
         address="test_address",
-        ssh_key_file="~/.ssh/id_rsa",
+        ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=30,
         cache_dir="~/.cache/covalent",
@@ -321,7 +396,6 @@ async def test_query_result(mocker, proc_mock, conn_mock):
             return unpatched_open(*args, **kwargs)
 
     with mock.patch("aiofiles.threadpool.sync_open", mock_open):
-
         result, stdout, stderr, exception = await executor._query_result(
             result_filename="mock_result", task_results_dir="", conn=conn_mock
         )
