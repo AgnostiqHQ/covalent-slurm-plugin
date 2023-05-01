@@ -48,6 +48,9 @@ setup_info = {
     "long_description_content_type": "text/markdown",
     "include_package_data": True,
     "install_requires": required,
+    "extras_require": {
+        "sshproxy": ["oathtool==2.3.1"],
+    },
     "classifiers": [
         "Development Status :: 4 - Beta",
         "Environment :: Console",

@@ -79,10 +79,10 @@ def test_init():
     assert executor.username == username
     assert executor.address == host
     assert executor.ssh_key_file == SSH_KEY_FILE
-    assert executor.cert_file == None
+    assert executor.cert_file is None
     assert executor.remote_workdir == "covalent-workdir"
-    assert executor.slurm_path == None
-    assert executor.conda_env == None
+    assert executor.slurm_path is None
+    assert executor.conda_env is None
     assert executor.poll_freq == 30
     assert executor.cache_dir == str(
         Path(get_config("dispatcher.cache_dir")).expanduser().resolve()

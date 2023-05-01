@@ -25,6 +25,7 @@ import os
 import re
 import sys
 from copy import deepcopy
+from datetime import datetime, strptime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple, Union
 
@@ -87,6 +88,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         conda_env: str = None,
         cache_dir: str = None,
         options: Dict = None,
+        sshproxy: Dict = None,
         poll_freq: int = 30,
         cleanup: bool = True,
         **kwargs,
@@ -98,15 +100,15 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
-        if not os.path.exists(self.ssh_key_file):
-            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
+        # if not os.path.exists(self.ssh_key_file):
+        #    raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
 
         if cert_file:
             self.cert_file = str(Path(cert_file).expanduser().resolve())
         else:
             self.cert_file = cert_file
-        if self.cert_file and not os.path.exists(self.cert_file):
-            raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
+        # if self.cert_file and not os.path.exists(self.cert_file):
+        #    raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
 
         self.remote_workdir = remote_workdir
         self.slurm_path = slurm_path
@@ -120,7 +122,18 @@ class SlurmExecutor(AsyncBaseExecutor):
             options = get_config("executors.slurm.options")
         self.options = deepcopy(options)
 
+        if sshproxy is None:
+            try:
+                sshproxy = get_config("executors.slurm.sshproxy")
+            except KeyError:
+                sshproxy = {}
+        self.sshproxy = deepcopy(sshproxy)
+
         self.poll_freq = poll_freq
+        if self.poll_freq < 60:
+            print("Polling frequency will be increased to the minimum for Slurm: 60 seconds.")
+            self.poll_freq = 60
+
         self.cleanup = cleanup
 
         self.LOAD_SLURM_PREFIX = "source /etc/profile\n module whatis slurm &> /dev/null\n if [ $? -eq 0 ] ; then\n module load slurm\n fi\n"
@@ -135,6 +148,48 @@ class SlurmExecutor(AsyncBaseExecutor):
         Returns:
             The connection object
         """
+
+        if self.sshproxy:
+            try:
+                import oathtool
+            except ImportError:
+                raise RuntimeError(
+                    "To use 'sshproxy' options, reinstall the Slurm plugin as 'pip install covalent-slurm-plugin[sshproxy]'"
+                )
+
+            # Validate the certificate is not expired
+            valid_cert = False
+            if Path(self.cert_file).exists():
+                proc = await asyncio.create_subprocess_shell(
+                    f"ssh-keygen -L -f {self.cert_file} | awk '/Valid/ " + "{print $5}'",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await proc.communicate()
+
+                if proc.returncode != 0:
+                    raise RuntimeError(
+                        "Failed to identify the expiration of the SSH key. Is this key compatible with sshproxy?"
+                    )
+
+                expiration = strptime(stdout.decode(), "%Y-%m-%dT%h:%m:%s")
+                if expiration > datetime.now():
+                    valid_cert = True
+
+            if not valid_cert:
+                password = get_config("slurm.sshproxy.password")
+                otp = oathtool.generate_otp(get_config("slurm.sshproxy.secret"))
+                passphrase = f"{password}{otp}"
+
+                proc = await asyncio.create_subprocess_shell(
+                    f'echo "{password}{otp}" | sshproxy -u {self.username} -o {self.ssh_key_file}',
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await proc.communicate()
+
+                if proc.returncode != 0:
+                    raise RuntimeError(f"sshproxy failed to retrieve a key: {stderr.decode()}")
 
         if self.cert_file:
             client_keys = [
@@ -509,7 +564,7 @@ wait
                 remote_stderr_filename=self.options["error"],
             )
 
-        app_log.debug("Closing SSH connection...")
-        conn.close()
-        await conn.wait_closed()
-        app_log.debug("SSH connection closed, teardown complete")
+            app_log.debug("Closing SSH connection...")
+            conn.close()
+            await conn.wait_closed()
+            app_log.debug("SSH connection closed, teardown complete")
