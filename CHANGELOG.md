@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.10.0] - 2023-05-01
+
 ### Added
 
 - Modified executor to use `srun` in slurm script, instead of injecting python code and calling python directly.
