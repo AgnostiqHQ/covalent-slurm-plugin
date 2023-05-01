@@ -52,9 +52,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "options": {
         "parsable": "",
     },
-    "srun_options": {
-        "slurmd-debug": "4",
-    },
+    "srun_options": {},
     "srun_append": None,
     "prerun_commands": None,
     "postrun_commands": None,
