@@ -172,7 +172,6 @@ class SlurmExecutor(AsyncBaseExecutor):
                 raise RuntimeError(
                     "To use 'sshproxy' options, reinstall the Slurm plugin as 'pip install covalent-slurm-plugin[sshproxy]'"
                 )
-            app_log.debug("SSHProxy is active")
 
             # Validate the certificate is not expired
             valid_cert = False
@@ -189,12 +188,9 @@ class SlurmExecutor(AsyncBaseExecutor):
                         "Failed to identify the expiration of the SSH key. Is this key compatible with sshproxy?"
                     )
 
-                print(stdout.decode())
                 expiration = datetime.strptime(stdout.decode().rstrip(), "%Y-%m-%dT%H:%M:%S")
-                # expiration = datetime.fromisoformat(stdout.decode())
                 if expiration > datetime.now():
                     valid_cert = True
-                    print("SSHProxy is not needed!")
 
                 app_log.debug(f"Certificate expiration: {stdout.decode()}")
 
@@ -204,11 +200,12 @@ class SlurmExecutor(AsyncBaseExecutor):
                 otp = oathtool.generate_otp(self.sshproxy["secret"])
 
                 proc = await asyncio.create_subprocess_shell(
-                    f'echo "{password}{otp}" | sshproxy -u {self.username} -o {self.ssh_key_file}',
+                    f"sshproxy -u {self.username} -o {self.ssh_key_file}",
+                    stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await proc.communicate()
+                stdout, stderr = await proc.communicate(input=f"{password}{otp}".encode())
 
                 if proc.returncode != 0:
                     raise RuntimeError(f"sshproxy failed to retrieve a key: {stderr.decode()}")
