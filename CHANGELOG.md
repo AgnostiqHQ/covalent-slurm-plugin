@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+- Added instructions to the `README` for the remote machine's dependencies.
+
+### Changed
+- Automatically apply the `"parsable": ""` option by default if not set by the user.
+
 ## [0.10.0] - 2023-05-01
 
 ### Added

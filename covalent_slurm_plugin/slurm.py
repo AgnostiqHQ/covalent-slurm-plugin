@@ -135,6 +135,10 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.poll_freq = poll_freq
         self.cleanup = cleanup
 
+        # Ensure that the slurm data is parsable
+        if "parsable" not in self.options:
+            self.options["parsable"] = ""
+
         self.LOAD_SLURM_PREFIX = "source /etc/profile\n module whatis slurm &> /dev/null\n if [ $? -eq 0 ] ; then\n module load slurm\n fi\n"
 
     async def _client_connect(self) -> asyncssh.SSHClientConnection:
