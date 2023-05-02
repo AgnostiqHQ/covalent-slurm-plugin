@@ -135,7 +135,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.poll_freq = poll_freq
         self.cleanup = cleanup
 
-        # Ensure that the slurm data is pasable
+        # Ensure that the slurm data is parsable
         if "parsable" not in self.options:
             self.options["parsable"] = ""
 
