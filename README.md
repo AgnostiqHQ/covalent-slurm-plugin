@@ -23,7 +23,7 @@ To use this plugin with Covalent, simply install it using `pip`:
 pip install covalent-slurm-plugin
 ```
 
-On the remote system, the Python environment you plan to use must be the same as the one you use to dispatch the calculations. Additionally, the remote system's Python environment must have the base [covalent package](https://github.com/AgnostiqHQ/covalent) installed (e.g. `pip install covalent`) in addition to [cloudpickle](https://github.com/cloudpipe/cloudpickle), which will automatically be installed with the former.
+On the remote system, the Python version in the environment you plan to use must match that used when dispatching the calculations. Additionally, the remote system's Python environment must have the base [covalent package](https://github.com/AgnostiqHQ/covalent) installed (e.g. `pip install covalent`) in addition to [cloudpickle](https://github.com/cloudpipe/cloudpickle), the latter of which will automatically be installed with covalent.
 
 ## Usage
 The following shows an example of a Covalent [configuration](https://covalent.readthedocs.io/en/latest/how_to/config/customization.html) that is modified to support Slurm:
