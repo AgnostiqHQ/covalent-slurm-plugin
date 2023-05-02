@@ -122,7 +122,7 @@ def test_init():
     assert executor.conda_env == conda_env
     assert executor.poll_freq == poll_freq
     assert executor.cache_dir == cache_dir
-    assert executor.options == {}
+    assert executor.options == {"parsable": ""}
 
 
 def test_format_py_script():
