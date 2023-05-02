@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.11.0] - 2023-05-02
+
 ### Added
 - Added instructions to the `README` for the remote machine's dependencies.
 
