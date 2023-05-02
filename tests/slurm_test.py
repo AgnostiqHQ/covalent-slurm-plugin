@@ -18,7 +18,7 @@
 #
 # Relief from the License may be granted by purchasing a commercial license.
 
-"""Tests for the SSH executor plugin."""
+"""Tests for the SLURM executor plugin."""
 
 import os
 from functools import partial
@@ -122,14 +122,14 @@ def test_init():
     assert executor.conda_env == conda_env
     assert executor.poll_freq == poll_freq
     assert executor.cache_dir == cache_dir
-    assert executor.options == {}
+    assert executor.options == {"parsable": ""}
 
 
-def test_format_submit_script():
-    """Test that the script (in string form) which is to be run on the remote server is
-    created with no errors."""
+def test_format_py_script():
+    """Test that the python script (in string form) which is to be executed (via srun)
+    on the remote server is created with no errors."""
 
-    executor = SlurmExecutor(
+    executor_0 = SlurmExecutor(
         username="test_user",
         address="test_address",
         ssh_key_file=SSH_KEY_FILE,
@@ -138,6 +138,33 @@ def test_format_submit_script():
         poll_freq=30,
         cache_dir="~/.cache/covalent",
         options={},
+    )
+
+    dispatch_id = "148dedae-1b58-3870-z08d-db89bceec915"
+    task_id = 2
+    func_filename = f"func-{dispatch_id}-{task_id}.pkl"
+    result_filename = f"result-{dispatch_id}-{task_id}.pkl"
+
+    try:
+        py_script_str = executor_0._format_py_script(
+            func_filename=func_filename, result_filename=result_filename
+        )
+        print(py_script_str)
+    except Exception as exc:
+        assert False, f"Exception while running _format_py_script: {exc}"
+
+
+def test_format_submit_script_default():
+    """Test that the shell script (in string form) which is to be submitted on
+    the remote server is created with no errors."""
+
+    executor_0 = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/federation/test_user/.cache/covalent",
+        poll_freq=30,
+        cache_dir="~/.cache/covalent",
     )
 
     def simple_task(x):
@@ -150,44 +177,97 @@ def test_format_submit_script():
 
     dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
     task_id = 3
-    func_filename = f"func-{dispatch_id}-{task_id}.pkl"
-    result_filename = f"result-{dispatch_id}-{task_id}.pkl"
+    py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        executor._format_submit_script(
-            func_filename,
-            result_filename,
-            python_version,
+        submit_script_str = executor_0._format_submit_script(
+            python_version=python_version, py_filename=py_filename
+        )
+        print(submit_script_str)
+    except Exception as exc:
+        assert False, f"Exception while running _format_submit_script with default options: {exc}"
+
+    shebang = "#!/bin/bash\n"
+    assert submit_script_str.startswith(
+        shebang
+    ), f"Missing '{shebang[:-1]}' in sbatch shell script"
+
+
+def test_format_submit_script():
+    """Test that the shell script (in string form) which is to be submitted on
+    the remote server is created with no errors."""
+
+    executor_1 = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/scratch/user/experiment1",
+        conda_env="my-conda-env",
+        options={"nodes": 1, "c": 8, "qos": "regular"},
+        srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
+        srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
+        prerun_commands=[
+            "module load package/1.2.3",
+            "srun --ntasks-per-node 1 dcgmi profile --pause",
+        ],
+        postrun_commands=[
+            "srun --ntasks-per-node 1 dcgmi profile --resume",
+            "python ./path/to/my/post_process.py -j $SLURM_JOB_ID",
+        ],
+    )
+
+    def simple_task(x):
+        return x
+
+    transport_function = partial(
+        wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5)
+    )
+    python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
+
+    dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
+    task_id = 3
+    py_filename = f"script-{dispatch_id}-{task_id}.py"
+
+    try:
+        print(
+            executor_1._format_submit_script(
+                python_version=python_version, py_filename=py_filename
+            )
         )
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
 
 
-def test_failed_submit_script():
+@pytest.mark.asyncio
+async def test_failed_submit_script(mocker, conn_mock):
     "Test for expected errors"
 
+    mocker.patch("asyncssh.connect", return_value=conn_mock)
+
     with pytest.raises(FileNotFoundError):
-        SlurmExecutor(
+        executor = SlurmExecutor(
             username="test_user",
             address="test_address",
-            ssh_key_file="/this/file/does/not/exists",
+            ssh_key_file="/this/file/does/not/exist",
             remote_workdir="/federation/test_user/.cache/covalent",
             poll_freq=30,
             cache_dir="~/.cache/covalent",
             options={},
         )
+        await executor._client_connect()
 
     with pytest.raises(FileNotFoundError):
-        SlurmExecutor(
+        executor = SlurmExecutor(
             username="test_user",
             address="test_address",
             ssh_key_file=SSH_KEY_FILE,
-            cert_file="/this/file/does/not/exists",
+            cert_file="/this/file/does/not/exist",
             remote_workdir="/federation/test_user/.cache/covalent",
             poll_freq=30,
             cache_dir="~/.cache/covalent",
             options={},
         )
+        await executor._client_connect()
 
 
 @pytest.mark.asyncio
@@ -253,7 +333,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
         await executor._poll_slurm(0, conn_mock)
     except RuntimeError as raised_exception:
         expected_exception = RuntimeError("Job failed with status:\n", "AN ERROR")
-        assert type(raised_exception) == type(expected_exception)
+        assert isinstance(raised_exception, type(expected_exception))
         assert raised_exception.args == expected_exception.args
 
     conn_mock.run.assert_called_once()
@@ -261,7 +341,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
 
 @pytest.mark.asyncio
 async def test_query_result(mocker, proc_mock, conn_mock):
-    """Test querying results works as expected"""
+    """Test querying results works as expected."""
 
     executor = SlurmExecutor(
         username="test_user",
@@ -287,7 +367,7 @@ async def test_query_result(mocker, proc_mock, conn_mock):
         )
     except Exception as raised_exception:
         expected_exception = FileNotFoundError(1, "stderr")
-        assert type(raised_exception) == type(expected_exception)
+        assert isinstance(raised_exception, type(expected_exception))
         assert raised_exception.args == expected_exception.args
 
     # Now mock result files.
@@ -330,3 +410,214 @@ async def test_query_result(mocker, proc_mock, conn_mock):
         assert stdout == expected_stdout
         assert stderr == expected_stderr
         pickle_mock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run(mocker, proc_mock, conn_mock):
+    """Test calling run works as expected."""
+    executor = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/scratch/user/experiment1",
+        conda_env="my-conda-env",
+        options={"nodes": 1, "c": 8, "qos": "regular"},
+        srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
+        srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
+        prerun_commands=[
+            "module load package/1.2.3",
+            "srun --ntasks-per-node 1 dcgmi profile --pause",
+        ],
+        postrun_commands=[
+            "srun --ntasks-per-node 1 dcgmi profile --resume",
+            "python ./path/to/my/post_process.py -j $SLURM_JOB_ID",
+        ],
+    )
+
+    # dummy objects
+    def f(x, y):
+        return x + y
+
+    dummy_function = partial(wrapper_fn, TransportableObject(f), call_before=[], call_after=[])
+
+    dummy_metadata = {
+        "dispatch_id": "259efebf-2c69-4981-a19e-ec90cdffd026",
+        "node_id": 1,
+        "results_dir": "results/directory/on/remote",
+    }
+
+    dummy_args = (
+        dummy_function,
+        [TransportableObject(2)],
+        {"y": TransportableObject(3)},
+        dummy_metadata,
+    )
+
+    dummy_error_msg = "dummy_error_message"
+
+    # mock behavior
+    conn_mock.run = mock.AsyncMock(return_value=proc_mock)
+    conn_mock.wait_closed = mock.AsyncMock(return_value=None)
+
+    def reset_proc_mock():
+        proc_mock.stdout = ""
+        proc_mock.stderr = ""
+        proc_mock.returncode = 0
+
+    async def __client_connect_fail(*_):
+        return conn_mock
+
+    async def __client_connect_succeed(*_):
+        return conn_mock
+
+    async def __poll_slurm_succeed(*_):
+        return
+
+    async def __query_result_fail(*_):
+        return None, proc_mock.stdout, proc_mock.stderr, dummy_error_msg
+
+    async def __query_result_succeed(*_):
+        return "result", "", "", None
+
+    # patches
+    patch_ccf = mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_fail)
+    patch_ccs = mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_succeed)
+    patch_pss = mock.patch.object(SlurmExecutor, "_poll_slurm", new=__poll_slurm_succeed)
+    patch_qrf = mock.patch.object(SlurmExecutor, "_query_result", new=__query_result_fail)
+    patch_qrs = mock.patch.object(SlurmExecutor, "_query_result", new=__query_result_succeed)
+
+    # check failed ssh connection handled as expected
+    with patch_ccf:
+        msg = f"Could not connect to host: '{executor.address}' as user: '{executor.username}'"
+        with pytest.raises(Exception) as exc_info:
+            await executor.run(*dummy_args)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == (msg,)
+
+    # check failed creation of remote directory  handled as expected
+    msg = "Failed to create directory"
+    proc_mock.stderr = msg
+    with patch_ccs:
+        with pytest.raises(Exception) as exc_info:
+            await executor.run(*dummy_args)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == (msg,)
+    reset_proc_mock()
+
+    # check run call completes with no other errors when `slurm_path` specified
+    executor.slurm_path = "/path/to/slurm"
+    proc_mock.stdout = "53034272 COMPLETED"
+    with patch_ccs, patch_qrs:
+        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
+        await executor.run(*dummy_args)
+    executor.slurm_path = None
+    reset_proc_mock()
+
+    # check failed verification of slurm installation handled as expected
+    msg = "Please provide `slurm_path` to run sbatch command"
+    proc_mock.returncode = 1
+    with patch_ccs:
+        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
+        with pytest.raises(Exception) as exc_info:
+            await executor.run(*dummy_args)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == (msg,)
+    reset_proc_mock()
+
+    # check failed `cmd_sbatch` run on remote handled as expected
+    executor.slurm_path = "/path/to/slurm"
+    proc_mock.returncode = 1
+    with patch_ccs, patch_pss:
+        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
+        with pytest.raises(Exception) as exc_info:
+            await executor.run(*dummy_args)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == ("",)
+    executor.slurm_path = None
+    reset_proc_mock()
+
+    # check failed query handled as expected
+    proc_mock.stdout = "64145383 FAILED"
+    with patch_ccs, patch_pss, patch_qrf:
+        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
+        with pytest.raises(Exception) as exc_info:
+            await executor.run(*dummy_args)
+            assert exc_info.type is RuntimeError
+            assert exc_info.value.args == (dummy_error_msg,)
+    reset_proc_mock()
+
+    # check run call completes with no other errors
+    proc_mock.stdout = "75256494 COMPLETED"
+    with patch_ccs, patch_qrs:
+        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
+        await executor.run(*dummy_args)
+    reset_proc_mock()
+
+
+@pytest.mark.asyncio
+async def test_teardown(mocker, proc_mock, conn_mock):
+    """Test calling run works as expected."""
+    executor = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir="/scratch/user/experiment1",
+        conda_env="my-conda-env",
+        options={"nodes": 1, "c": 8, "qos": "regular"},
+        srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
+        srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
+        prerun_commands=[
+            "module load package/1.2.3",
+            "srun --ntasks-per-node 1 dcgmi profile --pause",
+        ],
+        postrun_commands=[
+            "srun --ntasks-per-node 1 dcgmi profile --resume",
+            "python ./path/to/my/post_process.py -j $SLURM_JOB_ID",
+        ],
+    )
+
+    # dummy objects
+    def f(x, y):
+        return x + y
+
+    dummy_function = partial(wrapper_fn, TransportableObject(f), call_before=[], call_after=[])
+
+    dummy_metadata = {
+        "dispatch_id": "259efebf-2c69-4981-a19e-ec90cdffd026",
+        "node_id": 1,
+        "results_dir": "results/directory/on/remote",
+    }
+
+    dummy_args = (
+        dummy_function,
+        [TransportableObject(2)],
+        {"y": TransportableObject(3)},
+        dummy_metadata,
+    )
+
+    # mock behavior
+    conn_mock.run = mock.AsyncMock(return_value=proc_mock)
+    conn_mock.wait_closed = mock.AsyncMock(return_value=None)
+
+    async def __client_connect_succeed(*_):
+        return conn_mock
+
+    async def __query_result_succeed(*_):
+        return "result", "", "", None
+
+    async def __perform_cleanup(*_, **__):
+        return
+
+    # patches
+    patch_ccs = mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_succeed)
+    patch_qrs = mock.patch.object(SlurmExecutor, "_query_result", new=__query_result_succeed)
+    patch_pc = mock.patch.object(SlurmExecutor, "perform_cleanup", new=__perform_cleanup)
+
+    # check teardown method works as expected
+    proc_mock.stdout = "86367505 COMPLETED"
+    proc_mock.stderr = ""
+    proc_mock.returncode = 0
+    with patch_ccs, patch_qrs, patch_pc:
+        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
+        await executor.run(*dummy_args)
+        await executor.teardown(dummy_metadata)
