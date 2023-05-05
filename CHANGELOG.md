@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Fixed
+
+- Moved executor validations out of constructor
+
 ## [0.12.0] - 2023-05-05
 
 ### Added
