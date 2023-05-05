@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.12.0] - 2023-05-05
+
 ### Added
 
 - Basic support for NERSC's sshproxy tool which uses MFA to generate SSH keys
