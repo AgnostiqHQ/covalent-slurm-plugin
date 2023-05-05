@@ -83,7 +83,7 @@ def test_init():
     assert executor.remote_workdir == "covalent-workdir"
     assert executor.slurm_path is None
     assert executor.conda_env is None
-    assert executor.poll_freq == 30
+    assert executor.poll_freq == 60
     assert executor.cache_dir == str(
         Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
     )
@@ -97,7 +97,7 @@ def test_init():
     remote_workdir = "/test/remote/workdir"
     slurm_path = "/opt/test/slurm/path"
     conda_env = "test_env"
-    poll_freq = 60
+    poll_freq = 90
     cache_dir = "/test/cache/dir"
 
     executor = SlurmExecutor(

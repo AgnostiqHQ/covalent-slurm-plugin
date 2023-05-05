@@ -87,11 +87,11 @@ class SlurmExecutor(AsyncBaseExecutor):
 
     def __init__(
         self,
-        username: str,
-        address: str,
-        ssh_key_file: str,
+        username: str = None,
+        address: str = None,
+        ssh_key_file: str = None,
         cert_file: str = None,
-        remote_workdir: str = "covalent-workdir",
+        remote_workdir: str = None,
         slurm_path: str = None,
         conda_env: str = None,
         cache_dir: str = None,
@@ -101,24 +101,32 @@ class SlurmExecutor(AsyncBaseExecutor):
         srun_append: str = None,
         prerun_commands: List[str] = None,
         postrun_commands: List[str] = None,
-        poll_freq: int = 30,
-        cleanup: bool = True,
+        poll_freq: int = None,
+        cleanup: bool = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
-        self.username = username
-        self.address = address
+        self.username = username or get_config("executors.slurm.username")
+        if not self.username:
+            raise ValueError("username is a required parameter in the Slurm plugin.")
+
+        self.address = address or get_config("executors.slurm.address")
+        if not self.address:
+            raise ValueError("address is a required parameter in the Slurm plugin.")
 
         ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
+        if not self.ssh_key_file:
+            raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
+
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
         self.cert_file = str(Path(cert_file).expanduser().resolve()) if cert_file else None
 
-        self.remote_workdir = remote_workdir
-        self.slurm_path = slurm_path
-        self.conda_env = conda_env
+        self.remote_workdir = remote_workdir or get_config("executors.slurm.remote_workdir")
+        self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
+        self.conda_env = conda_env or get_config("executors.slurm.conda_env")
 
-        cache_dir = cache_dir or get_config("dispatcher.cache_dir")
+        cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
         self.cache_dir = str(Path(cache_dir).expanduser().resolve())
 
         # To allow passing empty dictionary
@@ -175,7 +183,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
             # Validate the certificate is not expired
             valid_cert = False
-            if Path(self.cert_file).exists():
+            if self.cert_file and Path(self.cert_file).exists():
                 proc = await asyncio.create_subprocess_shell(
                     f"ssh-keygen -L -f {self.cert_file} | awk '/Valid/ " + "{print $5}'",
                     stdout=asyncio.subprocess.PIPE,
@@ -209,6 +217,9 @@ class SlurmExecutor(AsyncBaseExecutor):
 
                 if proc.returncode != 0:
                     raise RuntimeError(f"sshproxy failed to retrieve a key: {stderr.decode()}")
+
+                if not self.cert_file:
+                    self.cert_file = Path(self.ssh_key_file).parents[0] / "nersc-cert.pub"
 
                 app_log.debug("sshproxy successful")
 
