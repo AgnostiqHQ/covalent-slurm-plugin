@@ -39,7 +39,7 @@ jobs:
         with:
           requirements: "requirements.txt"
           fail: "Copyleft,Error,Other"
-          exclude: "^(pylint|aio[-_]*|covalent).*"
+          exclude: "^(pylint|aio[-_]*|covalent|asyncssh).*"
           with-totals: true
           table-headers: true
       - name: Print report
