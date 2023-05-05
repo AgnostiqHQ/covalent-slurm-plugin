@@ -25,6 +25,7 @@ import os
 import re
 import sys
 from copy import deepcopy
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple, Union
 
@@ -52,11 +53,11 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "options": {
         "parsable": "",
     },
+    "poll_freq": 60,
     "srun_options": {},
     "srun_append": None,
     "prerun_commands": None,
     "postrun_commands": None,
-    "poll_freq": 30,
     "cleanup": True,
 }
 
@@ -86,38 +87,58 @@ class SlurmExecutor(AsyncBaseExecutor):
 
     def __init__(
         self,
-        username: str,
-        address: str,
-        ssh_key_file: str,
+        username: str = None,
+        address: str = None,
+        ssh_key_file: str = None,
         cert_file: str = None,
-        remote_workdir: str = "covalent-workdir",
+        remote_workdir: str = None,
         slurm_path: str = None,
         conda_env: str = None,
         cache_dir: str = None,
         options: Dict = None,
+        sshproxy: Dict = None,
         srun_options: Dict = None,
         srun_append: str = None,
         prerun_commands: List[str] = None,
         postrun_commands: List[str] = None,
-        poll_freq: int = 30,
-        cleanup: bool = True,
+        poll_freq: int = None,
+        cleanup: bool = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
-        self.username = username
-        self.address = address
+        self.username = username or get_config("executors.slurm.username")
+        if not self.username:
+            raise ValueError("username is a required parameter in the Slurm plugin.")
 
-        ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
+        self.address = address or get_config("executors.slurm.address")
+        if not self.address:
+            raise ValueError("address is a required parameter in the Slurm plugin.")
+
+        self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
+        if not self.ssh_key_file:
+            raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
 
-        self.cert_file = str(Path(cert_file).expanduser().resolve()) if cert_file else None
+        try:
+            self.cert_file = cert_file or get_config("executors.slurm.cert_file")
+            self.cert_file = str(Path(self.cert_file).expanduser().resolve())
+        except KeyError:
+            self.cert_file = None
 
-        self.remote_workdir = remote_workdir
-        self.slurm_path = slurm_path
-        self.conda_env = conda_env
+        self.remote_workdir = remote_workdir or get_config("executors.slurm.remote_workdir")
 
-        cache_dir = cache_dir or get_config("dispatcher.cache_dir")
+        try:
+            self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
+        except KeyError:
+            self.slurm_path = None
+
+        try:
+            self.conda_env = conda_env or get_config("executors.slurm.conda_env")
+        except KeyError:
+            self.conda_env = None
+
+        cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
         self.cache_dir = str(Path(cache_dir).expanduser().resolve())
 
         # To allow passing empty dictionary
@@ -125,15 +146,31 @@ class SlurmExecutor(AsyncBaseExecutor):
             options = get_config("executors.slurm.options")
         self.options = deepcopy(options)
 
+        if sshproxy is None:
+            try:
+                sshproxy = get_config("executors.slurm.sshproxy")
+            except KeyError:
+                sshproxy = {}
+        self.sshproxy = deepcopy(sshproxy)
+
         if srun_options is None:
             srun_options = get_config("executors.slurm.srun_options")
         self.srun_options = deepcopy(srun_options)
 
-        self.srun_append = srun_append
+        try:
+            self.srun_append = srun_append or get_config("executors.slurm.srun_append")
+        except KeyError:
+            self.srun_append = None
+
         self.prerun_commands = list(prerun_commands) if prerun_commands else []
         self.postrun_commands = list(postrun_commands) if postrun_commands else []
-        self.poll_freq = poll_freq
-        self.cleanup = cleanup
+
+        self.poll_freq = poll_freq or get_config("executors.slurm.poll_freq")
+        if self.poll_freq < 60:
+            print("Polling frequency will be increased to the minimum for Slurm: 60 seconds.")
+            self.poll_freq = 60
+
+        self.cleanup = cleanup or get_config("executors.slurm.cleanup")
 
         # Ensure that the slurm data is parsable
         if "parsable" not in self.options:
@@ -151,6 +188,56 @@ class SlurmExecutor(AsyncBaseExecutor):
         Returns:
             The connection object
         """
+
+        if self.sshproxy and self.address in self.sshproxy["hosts"]:
+            try:
+                import oathtool
+            except ImportError:
+                raise RuntimeError(
+                    "To use 'sshproxy' options, reinstall the Slurm plugin as 'pip install covalent-slurm-plugin[sshproxy]'"
+                )
+
+            # Validate the certificate is not expired
+            valid_cert = False
+            if self.cert_file and Path(self.cert_file).exists():
+                proc = await asyncio.create_subprocess_shell(
+                    f"ssh-keygen -L -f {self.cert_file} | awk '/Valid/ " + "{print $5}'",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await proc.communicate()
+
+                if proc.returncode != 0:
+                    raise RuntimeError(
+                        "Failed to identify the expiration of the SSH key. Is this key compatible with sshproxy?"
+                    )
+
+                expiration = datetime.strptime(stdout.decode().rstrip(), "%Y-%m-%dT%H:%M:%S")
+                if expiration > datetime.now():
+                    valid_cert = True
+
+                app_log.debug(f"Certificate expiration: {stdout.decode()}")
+
+            if not valid_cert:
+                app_log.debug("Requesting new key and certificate")
+                password = self.sshproxy["password"]
+                otp = oathtool.generate_otp(self.sshproxy["secret"])
+
+                proc = await asyncio.create_subprocess_shell(
+                    f"sshproxy -u {self.username} -o {self.ssh_key_file}",
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await proc.communicate(input=f"{password}{otp}".encode())
+
+                if proc.returncode != 0:
+                    raise RuntimeError(f"sshproxy failed to retrieve a key: {stderr.decode()}")
+
+                if not self.cert_file:
+                    self.cert_file = Path(self.ssh_key_file).parents[0] / "nersc-cert.pub"
+
+                app_log.debug("sshproxy successful")
 
         if self.cert_file and not os.path.exists(self.cert_file):
             raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
@@ -564,19 +651,24 @@ with open("{result_filename}", "wb") as f:
 
     async def teardown(self, task_metadata: Dict):
         if self.cleanup:
-            app_log.debug("Performing cleanup on remote...")
-            conn = await self._client_connect()
-            await self.perform_cleanup(
-                conn=conn,
-                remote_func_filename=self._remote_func_filename,
-                remote_slurm_filename=self._remote_slurm_filename,
-                remote_py_filename=self._remote_py_script_filename,
-                remote_result_filename=os.path.join(self.remote_workdir, self._result_filename),
-                remote_stdout_filename=self.options["output"],
-                remote_stderr_filename=self.options["error"],
-            )
+            try:
+                app_log.debug("Performing cleanup on remote...")
+                conn = await self._client_connect()
+                await self.perform_cleanup(
+                    conn=conn,
+                    remote_func_filename=self._remote_func_filename,
+                    remote_slurm_filename=self._remote_slurm_filename,
+                    remote_py_filename=self._remote_py_script_filename,
+                    remote_result_filename=os.path.join(
+                        self.remote_workdir, self._result_filename
+                    ),
+                    remote_stdout_filename=self.options["output"],
+                    remote_stderr_filename=self.options["error"],
+                )
 
-            app_log.debug("Closing SSH connection...")
-            conn.close()
-            await conn.wait_closed()
-            app_log.debug("SSH connection closed, teardown complete")
+                app_log.debug("Closing SSH connection...")
+                conn.close()
+                await conn.wait_closed()
+                app_log.debug("SSH connection closed, teardown complete")
+            except Exception:
+                app_log.warning("Slurm cleanup could not successfully complete. Nonfatal error.")
