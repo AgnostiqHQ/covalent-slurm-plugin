@@ -115,16 +115,28 @@ class SlurmExecutor(AsyncBaseExecutor):
         if not self.address:
             raise ValueError("address is a required parameter in the Slurm plugin.")
 
-        ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
+        self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         if not self.ssh_key_file:
             raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
-
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
-        self.cert_file = str(Path(cert_file).expanduser().resolve()) if cert_file else None
+
+        try:
+            self.cert_file = cert_file or get_config("executors.slurm.cert_file")
+            self.cert_file = str(Path(self.cert_file).expanduser().resolve())
+        except KeyError:
+            self.cert_file = None
 
         self.remote_workdir = remote_workdir or get_config("executors.slurm.remote_workdir")
-        self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
-        self.conda_env = conda_env or get_config("executors.slurm.conda_env")
+
+        try:
+            self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
+        except KeyError:
+            self.slurm_path = None
+
+        try:
+            self.conda_env = conda_env or get_config("executors.slurm.conda_env")
+        except KeyError:
+            self.conda_env = None
 
         cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
         self.cache_dir = str(Path(cache_dir).expanduser().resolve())
@@ -145,16 +157,20 @@ class SlurmExecutor(AsyncBaseExecutor):
             srun_options = get_config("executors.slurm.srun_options")
         self.srun_options = deepcopy(srun_options)
 
-        self.srun_append = srun_append
+        try:
+            self.srun_append = srun_append or get_config("executors.slurm.srun_append")
+        except KeyError:
+            self.srun_append = None
+
         self.prerun_commands = list(prerun_commands) if prerun_commands else []
         self.postrun_commands = list(postrun_commands) if postrun_commands else []
 
-        self.poll_freq = poll_freq
+        self.poll_freq = poll_freq or get_config("executors.slurm.poll_freq")
         if self.poll_freq < 60:
             print("Polling frequency will be increased to the minimum for Slurm: 60 seconds.")
             self.poll_freq = 60
 
-        self.cleanup = cleanup
+        self.cleanup = cleanup or get_config("executors.slurm.cleanup")
 
         # Ensure that the slurm data is parsable
         if "parsable" not in self.options:
