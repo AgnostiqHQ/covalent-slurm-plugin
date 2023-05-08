@@ -87,6 +87,7 @@ def test_init():
     assert executor.cache_dir == str(
         Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
     )
+    assert executor.cleanup == True
     assert executor.options == {"parsable": ""}
 
     # Test with non-defaults
