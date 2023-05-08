@@ -81,13 +81,19 @@ def test_init():
     assert executor.ssh_key_file == SSH_KEY_FILE
     assert executor.cert_file is None
     assert executor.remote_workdir == "covalent-workdir"
+    assert executor.unique_workdir is False
     assert executor.slurm_path is None
     assert executor.conda_env is None
-    assert executor.poll_freq == 60
     assert executor.cache_dir == str(
         Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
     )
     assert executor.options == {"parsable": ""}
+    assert executor.srun_options == {}
+    assert executor.srun_append is None
+    assert executor.prerun_commands == []
+    assert executor.postrun_commands == []
+    assert executor.poll_freq == 60
+    assert executor.cleanup is True
 
     # Test with non-defaults
     username = "username"
@@ -95,10 +101,23 @@ def test_init():
     key_file = SSH_KEY_FILE
     cert_file = CERT_FILE
     remote_workdir = "/test/remote/workdir"
+    unique_workdir = True
     slurm_path = "/opt/test/slurm/path"
     conda_env = "test_env"
-    poll_freq = 90
     cache_dir = "/test/cache/dir"
+    options = {"account": "test"}
+    srun_options = {"slurmd-debug": 4}
+    srun_append = "test"
+    prerun_commands = [
+        "module load package/1.2.3",
+        "srun --ntasks-per-node 1 dcgmi profile --pause",
+    ]
+    postrun_commands = [
+        "srun --ntasks-per-node 1 dcgmi profile --resume",
+        "python ./path/to/my/post_process.py -j $SLURM_JOB_ID",
+    ]
+    poll_freq = 90
+    cleanup = False
 
     executor = SlurmExecutor(
         username=username,
@@ -106,11 +125,17 @@ def test_init():
         ssh_key_file=key_file,
         cert_file=cert_file,
         remote_workdir=remote_workdir,
+        unique_workdir=unique_workdir,
         slurm_path=slurm_path,
         conda_env=conda_env,
-        poll_freq=poll_freq,
         cache_dir=cache_dir,
-        options={},
+        options=options,
+        srun_options=srun_options,
+        srun_append=srun_append,
+        prerun_commands=prerun_commands,
+        postrun_commands=postrun_commands,
+        poll_freq=poll_freq,
+        cleanup=cleanup,
     )
 
     assert executor.username == username
@@ -118,11 +143,27 @@ def test_init():
     assert executor.ssh_key_file == SSH_KEY_FILE
     assert executor.cert_file == CERT_FILE
     assert executor.remote_workdir == remote_workdir
+    assert executor.unique_workdir == unique_workdir
     assert executor.slurm_path == slurm_path
     assert executor.conda_env == conda_env
-    assert executor.poll_freq == poll_freq
     assert executor.cache_dir == cache_dir
-    assert executor.options == {"parsable": ""}
+    assert executor.options == {"account": "test", "parsable": ""}
+    assert executor.srun_options == srun_options
+    assert executor.srun_append == srun_append
+    assert executor.prerun_commands == prerun_commands
+    assert executor.postrun_commands == postrun_commands
+    assert executor.poll_freq == poll_freq
+    assert executor.cleanup == cleanup
+
+    # Test poll freq is auto-raised
+    executor = SlurmExecutor(
+        username=username,
+        address=host,
+        ssh_key_file=key_file,
+        poll_freq=30,
+    )
+
+    assert executor.poll_freq == 60
 
 
 def test_format_py_script():
@@ -135,7 +176,7 @@ def test_format_py_script():
         ssh_key_file=SSH_KEY_FILE,
         cert_file=CERT_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=30,
+        poll_freq=60,
         cache_dir="~/.cache/covalent",
         options={},
     )
@@ -152,6 +193,36 @@ def test_format_py_script():
         print(py_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_py_script: {exc}"
+    assert func_filename in py_script_str
+    assert result_filename in py_script_str
+    assert os.path.join(dispatch_id, "node_" + str(task_id)) not in py_script_str
+
+
+def test_format_py_script_unique_workdir():
+    """Same as test_format_py_script but with unique_workdir=True."""
+    executor_0 = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file=SSH_KEY_FILE,
+        remote_workdir="/federation/test_user/.cache/covalent",
+        unique_workdir=True,
+    )
+
+    dispatch_id = "148dedae-1b58-3870-z08d-db89bceec915"
+    task_id = 2
+    func_filename = f"func-{dispatch_id}-{task_id}.pkl"
+    result_filename = f"result-{dispatch_id}-{task_id}.pkl"
+    executor_0._current_remote_workdir = os.path.join(dispatch_id, "node_" + str(task_id))
+    try:
+        py_script_str = executor_0._format_py_script(
+            func_filename=func_filename, result_filename=result_filename
+        )
+        print(py_script_str)
+    except Exception as exc:
+        assert False, f"Exception while running _format_py_script: {exc}"
+    assert func_filename in py_script_str
+    assert result_filename in py_script_str
+    assert os.path.join(dispatch_id, "node_" + str(task_id)) in py_script_str
 
 
 def test_format_submit_script_default():
@@ -163,7 +234,7 @@ def test_format_submit_script_default():
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=30,
+        poll_freq=60,
         cache_dir="~/.cache/covalent",
     )
 
@@ -186,6 +257,7 @@ def test_format_submit_script_default():
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script with default options: {exc}"
+    assert python_version in submit_script_str
 
     shebang = "#!/bin/bash\n"
     assert submit_script_str.startswith(
@@ -229,13 +301,17 @@ def test_format_submit_script():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        print(
-            executor_1._format_submit_script(
-                python_version=python_version, py_filename=py_filename
-            )
+        submit_script_str = executor_1._format_submit_script(
+            python_version=python_version, py_filename=py_filename
         )
+        print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
+    assert "my-conda-env" in submit_script_str
+    for prerun_command in executor_1.prerun_commands:
+        assert prerun_command in submit_script_str
+    for postrun_command in executor_1.postrun_commands:
+        assert postrun_command in submit_script_str
 
 
 @pytest.mark.asyncio
@@ -250,7 +326,7 @@ async def test_failed_submit_script(mocker, conn_mock):
             address="test_address",
             ssh_key_file="/this/file/does/not/exist",
             remote_workdir="/federation/test_user/.cache/covalent",
-            poll_freq=30,
+            poll_freq=60,
             cache_dir="~/.cache/covalent",
             options={},
         )
@@ -263,7 +339,7 @@ async def test_failed_submit_script(mocker, conn_mock):
             ssh_key_file=SSH_KEY_FILE,
             cert_file="/this/file/does/not/exist",
             remote_workdir="/federation/test_user/.cache/covalent",
-            poll_freq=30,
+            poll_freq=60,
             cache_dir="~/.cache/covalent",
             options={},
         )
@@ -279,7 +355,7 @@ async def test_get_status(proc_mock, conn_mock):
         address="test_address",
         ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=30,
+        poll_freq=60,
         cache_dir="~/.cache/covalent",
         options={},
     )
@@ -307,7 +383,7 @@ async def test_poll_slurm(proc_mock, conn_mock):
         address="test_address",
         ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=30,
+        poll_freq=60,
         cache_dir="~/.cache/covalent",
         options={},
         slurm_path="sample_path",
@@ -348,7 +424,7 @@ async def test_query_result(mocker, proc_mock, conn_mock):
         address="test_address",
         ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=30,
+        poll_freq=60,
         cache_dir="~/.cache/covalent",
         options={"output": "stdout_file", "error": "stderr_file"},
     )
@@ -420,6 +496,7 @@ async def test_run(mocker, proc_mock, conn_mock):
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/scratch/user/experiment1",
+        unique_workdir=True,
         conda_env="my-conda-env",
         options={"nodes": 1, "c": 8, "qos": "regular"},
         srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
@@ -494,7 +571,7 @@ async def test_run(mocker, proc_mock, conn_mock):
             assert exc_info.type is RuntimeError
             assert exc_info.value.args == (msg,)
 
-    # check failed creation of remote directory  handled as expected
+    # check failed creation of remote directory handled as expected
     msg = "Failed to create directory"
     proc_mock.stderr = msg
     with patch_ccs:
@@ -562,6 +639,7 @@ async def test_teardown(mocker, proc_mock, conn_mock):
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/scratch/user/experiment1",
+        unique_workdir=True,
         conda_env="my-conda-env",
         options={"nodes": 1, "c": 8, "qos": "regular"},
         srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
