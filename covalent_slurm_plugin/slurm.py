@@ -162,7 +162,7 @@ class SlurmExecutor(AsyncBaseExecutor):
                 sshproxy = {}
         self.sshproxy = deepcopy(sshproxy)
 
-        if self.sshproxy and not oathtool:
+        if self.sshproxy and oath tool is None:
             raise RuntimeError(
                 "To use 'sshproxy' options, reinstall the Slurm plugin as 'pip install covalent-slurm-plugin[sshproxy]'"
             )
