@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Fixed
+
+- Fixed a bug where `cleanup = False` would be ignored.
+
 ## [0.12.1] - 2023-05-05
 
 ### Fixed
