@@ -99,6 +99,7 @@ def test_init():
     conda_env = "test_env"
     poll_freq = 90
     cache_dir = "/test/cache/dir"
+    cleanup = False
 
     executor = SlurmExecutor(
         username=username,
@@ -110,6 +111,7 @@ def test_init():
         conda_env=conda_env,
         poll_freq=poll_freq,
         cache_dir=cache_dir,
+        cleanup=cleanup,
         options={},
     )
 
@@ -122,6 +124,7 @@ def test_init():
     assert executor.conda_env == conda_env
     assert executor.poll_freq == poll_freq
     assert executor.cache_dir == cache_dir
+    assert executor.cleanup == cleanup
     assert executor.options == {"parsable": ""}
 
 
