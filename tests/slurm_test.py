@@ -147,11 +147,7 @@ def test_init():
     assert executor.slurm_path == slurm_path
     assert executor.conda_env == conda_env
     assert executor.cache_dir == cache_dir
-    assert executor.options == {
-        "account": "test",
-        "parsable": "",
-        "chdir": executor._current_remote_workdir,
-    }
+    assert executor.options == {"account": "test", "parsable": ""}
     assert executor.srun_options == srun_options
     assert executor.srun_append == srun_append
     assert executor.prerun_commands == prerun_commands
@@ -316,6 +312,7 @@ def test_format_submit_script():
         assert prerun_command in submit_script_str
     for postrun_command in executor_1.postrun_commands:
         assert postrun_command in submit_script_str
+    assert "--chdir=" + os.path.join(dispatch_id, "node_" + str(task_id)) in submit_script_str
 
 
 @pytest.mark.asyncio
