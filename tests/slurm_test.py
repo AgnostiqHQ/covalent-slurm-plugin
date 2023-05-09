@@ -147,7 +147,11 @@ def test_init():
     assert executor.slurm_path == slurm_path
     assert executor.conda_env == conda_env
     assert executor.cache_dir == cache_dir
-    assert executor.options == {"account": "test", "parsable": ""}
+    assert executor.options == {
+        "account": "test",
+        "parsable": "",
+        "chdir": executor._current_remote_workdir,
+    }
     assert executor.srun_options == srun_options
     assert executor.srun_append == srun_append
     assert executor.prerun_commands == prerun_commands

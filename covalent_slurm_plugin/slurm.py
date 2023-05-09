@@ -332,6 +332,10 @@ class SlurmExecutor(AsyncBaseExecutor):
             script: String object containing a script parsable by sbatch.
         """
 
+        # Add chdir to current working directory if not specified
+        if "chdir" not in self.options:
+            self.options["chdir"] = self._current_remote_workdir
+
         # preamble
         slurm_preamble = "#!/bin/bash\n"
         for key, value in self.options.items():
