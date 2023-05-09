@@ -81,7 +81,7 @@ def test_init():
     assert executor.ssh_key_file == SSH_KEY_FILE
     assert executor.cert_file is None
     assert executor.remote_workdir == "covalent-workdir"
-    assert executor.unique_workdir is False
+    assert executor.create_unique_workdir is False
     assert executor.slurm_path is None
     assert executor.conda_env is None
     assert executor.cache_dir == str(
@@ -101,7 +101,7 @@ def test_init():
     key_file = SSH_KEY_FILE
     cert_file = CERT_FILE
     remote_workdir = "/test/remote/workdir"
-    unique_workdir = True
+    create_unique_workdir = True
     slurm_path = "/opt/test/slurm/path"
     conda_env = "test_env"
     cache_dir = "/test/cache/dir"
@@ -125,7 +125,7 @@ def test_init():
         ssh_key_file=key_file,
         cert_file=cert_file,
         remote_workdir=remote_workdir,
-        unique_workdir=unique_workdir,
+        create_unique_workdir=create_unique_workdir,
         slurm_path=slurm_path,
         conda_env=conda_env,
         cache_dir=cache_dir,
@@ -143,7 +143,7 @@ def test_init():
     assert executor.ssh_key_file == SSH_KEY_FILE
     assert executor.cert_file == CERT_FILE
     assert executor.remote_workdir == remote_workdir
-    assert executor.unique_workdir == unique_workdir
+    assert executor.create_unique_workdir == create_unique_workdir
     assert executor.slurm_path == slurm_path
     assert executor.conda_env == conda_env
     assert executor.cache_dir == cache_dir
@@ -198,14 +198,14 @@ def test_format_py_script():
     assert os.path.join(dispatch_id, "node_" + str(task_id)) not in py_script_str
 
 
-def test_format_py_script_unique_workdir():
-    """Same as test_format_py_script but with unique_workdir=True."""
+def test_format_py_script_create_unique_workdir():
+    """Same as test_format_py_script but with create_unique_workdir=True."""
     executor_0 = SlurmExecutor(
         username="test_user",
         address="test_address",
         ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
-        unique_workdir=True,
+        create_unique_workdir=True,
     )
 
     dispatch_id = "148dedae-1b58-3870-z08d-db89bceec915"
@@ -496,7 +496,7 @@ async def test_run(mocker, proc_mock, conn_mock):
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/scratch/user/experiment1",
-        unique_workdir=True,
+        create_unique_workdir=True,
         conda_env="my-conda-env",
         options={"nodes": 1, "c": 8, "qos": "regular"},
         srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
@@ -639,7 +639,7 @@ async def test_teardown(mocker, proc_mock, conn_mock):
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/scratch/user/experiment1",
-        unique_workdir=True,
+        create_unique_workdir=True,
         conda_env="my-conda-env",
         options={"nodes": 1, "c": 8, "qos": "regular"},
         srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
