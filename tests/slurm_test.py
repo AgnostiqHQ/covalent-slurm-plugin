@@ -274,6 +274,7 @@ def test_format_submit_script():
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/scratch/user/experiment1",
+        create_unique_workdir=True,
         conda_env="my-conda-env",
         options={"nodes": 1, "c": 8, "qos": "regular"},
         srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
