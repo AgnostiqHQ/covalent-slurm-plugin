@@ -308,7 +308,7 @@ def test_format_submit_script():
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
-    assert "my-conda-env" in submit_script_str
+    assert "conda activate my-conda-env" in submit_script_str
     for prerun_command in executor_1.prerun_commands:
         assert prerun_command in submit_script_str
     for postrun_command in executor_1.postrun_commands:
