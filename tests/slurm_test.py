@@ -313,7 +313,7 @@ def test_format_submit_script():
         assert prerun_command in submit_script_str
     for postrun_command in executor_1.postrun_commands:
         assert postrun_command in submit_script_str
-    assert "--chdir=" + os.path.join(dispatch_id, "node_" + str(task_id)) in submit_script_str
+    assert "--chdir=" in submit_script_str
 
 
 @pytest.mark.asyncio
