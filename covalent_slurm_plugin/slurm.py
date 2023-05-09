@@ -38,11 +38,6 @@ from covalent._shared_files import logger
 from covalent._shared_files.config import get_config
 from covalent.executor.base import AsyncBaseExecutor
 
-try:
-    import oathtool
-except ImportError:
-    oathtool = None
-
 app_log = logger.app_log
 log_stack_info = logger.log_stack_info
 
@@ -52,7 +47,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "ssh_key_file": "",
     "cert_file": None,
     "remote_workdir": "covalent-workdir",
-    "unique_workdir": False,
+    "create_unique_workdir": False,
     "slurm_path": None,
     "conda_env": None,
     "cache_dir": str(Path(get_config("dispatcher.cache_dir")).expanduser().resolve()),
@@ -79,7 +74,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         ssh_key_file: Private RSA key used to authenticate over SSH.
         cert_file: Certificate file used to authenticate over SSH, if required.
         remote_workdir: Working directory on the remote cluster.
-        unique_workdir: Whether to create a unique working (sub)directory for each task.
+        create_unique_workdir: Whether to create a unique working (sub)directory for each task.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function.
         cache_dir: Cache directory used by this executor for temporary files.
@@ -99,7 +94,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         ssh_key_file: str = None,
         cert_file: str = None,
         remote_workdir: str = None,
-        unique_workdir: bool = None,
+        create_unique_workdir: bool = None,
         slurm_path: str = None,
         conda_env: str = None,
         cache_dir: str = None,
@@ -129,10 +124,10 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         self.remote_workdir = remote_workdir or get_config("executors.slurm.remote_workdir")
 
-        if unique_workdir is None:
-            self.unique_workdir = get_config("executors.slurm.unique_workdir")
+        if create_unique_workdir is None:
+            self.create_unique_workdir = get_config("executors.slurm.create_unique_workdir")
         else:
-            self.unique_workdir = unique_workdir
+            self.create_unique_workdir = create_unique_workdir
 
         # Set the current remote workdir as remote workdir to start, but this will be updated
         self._current_remote_workdir = self.remote_workdir
@@ -161,11 +156,6 @@ class SlurmExecutor(AsyncBaseExecutor):
             except KeyError:
                 sshproxy = {}
         self.sshproxy = deepcopy(sshproxy)
-
-        if self.sshproxy and not oathtool:
-            raise RuntimeError(
-                "To use 'sshproxy' options, reinstall the Slurm plugin as 'pip install covalent-slurm-plugin[sshproxy]'"
-            )
 
         if srun_options is None:
             srun_options = get_config("executors.slurm.srun_options")
@@ -216,6 +206,13 @@ class SlurmExecutor(AsyncBaseExecutor):
             raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
 
         if self.sshproxy and self.address in self.sshproxy["hosts"]:
+            try:
+                import oathtool
+            except ImportError:
+                raise RuntimeError(
+                    "To use 'sshproxy' options, reinstall the Slurm plugin as 'pip install covalent-slurm-plugin[sshproxy]'"
+                )
+
             # Validate the certificate is not expired
             valid_cert = False
             if self.cert_file and Path(self.cert_file).exists():
