@@ -77,7 +77,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         create_unique_workdir: Whether to create a unique working (sub)directory for each task.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function.
-        cache_dir: Cache directory used by this executor for temporary files.
+        cache_dir: Local cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
         srun_options: Dictionary of parameters passed to srun inside submit script.
         srun_append: Command nested into srun call.
@@ -130,9 +130,6 @@ class SlurmExecutor(AsyncBaseExecutor):
             else create_unique_workdir
         )
 
-        # Set the current remote workdir as remote workdir to start, but this will be updated
-        self._current_remote_workdir = self.remote_workdir
-
         try:
             self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
         except KeyError:
@@ -145,6 +142,8 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
         self.cache_dir = str(Path(cache_dir).expanduser().resolve())
+        if not os.path.exists(self.cache_dir):
+            os.mkdir(self.cache_dir)
 
         # To allow passing empty dictionary
         if options is None:
@@ -320,6 +319,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         self,
         python_version: str,
         py_filename: str,
+        current_remote_workdir:str
     ) -> str:
         """Create the SLURM that defines the job, uses srun to run the python script.
 
@@ -331,7 +331,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         """
 
         # Add chdir to current working directory
-        self.options["chdir"] = self._current_remote_workdir
+        self.options["chdir"] = current_remote_workdir
 
         # preamble
         slurm_preamble = "#!/bin/bash\n"
@@ -556,7 +556,7 @@ with open("{result_filename}", "wb") as f:
         node_id = task_metadata["node_id"]
         results_dir = task_metadata["results_dir"]
         task_results_dir = os.path.join(results_dir, dispatch_id)
-        self._current_remote_workdir = os.path.join(
+        current_remote_workdir = os.path.join(
             self.remote_workdir, dispatch_id, "node_" + str(node_id)
         )
 
@@ -567,11 +567,11 @@ with open("{result_filename}", "wb") as f:
 
         if "output" not in self.options:
             self.options["output"] = os.path.join(
-                self._current_remote_workdir, f"stdout-{dispatch_id}-{node_id}.log"
+                current_remote_workdir, f"stdout-{dispatch_id}-{node_id}.log"
             )
         if "error" not in self.options:
             self.options["error"] = os.path.join(
-                self._current_remote_workdir, f"stderr-{dispatch_id}-{node_id}.log"
+                current_remote_workdir, f"stderr-{dispatch_id}-{node_id}.log"
             )
 
         result = None
@@ -582,16 +582,11 @@ with open("{result_filename}", "wb") as f:
         app_log.debug(f"Python version: {py_version_func}")
 
         # Create the remote directory
-        app_log.debug(f"Creating remote work directory {self._current_remote_workdir} ...")
-        cmd_mkdir_remote = f"mkdir -p {self._current_remote_workdir}"
-        cmd_mkdir_cache = f"mkdir -p {self.cache_dir}"
-
+        app_log.debug(f"Creating remote work directory {current_remote_workdir} ...")
+        cmd_mkdir_remote = f"mkdir -p {current_remote_workdir}"
         proc_mkdir_remote = await conn.run(cmd_mkdir_remote)
+        
         if client_err := proc_mkdir_remote.stderr.strip():
-            raise RuntimeError(client_err)
-
-        proc_mkdir_cache = await conn.run(cmd_mkdir_cache)
-        if client_err := proc_mkdir_cache.stderr.strip():
             raise RuntimeError(client_err)
 
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir) as temp_f:
@@ -617,12 +612,12 @@ with open("{result_filename}", "wb") as f:
 
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_h:
             # Format the SLURM submit script, write to file, and copy to remote filesystem
-            slurm_submit_script = self._format_submit_script(py_version_func, py_script_filename)
+            slurm_submit_script = self._format_submit_script(py_version_func, py_script_filename,current_remote_workdir)
             app_log.debug("Writing slurm submit script to tempfile...")
             await temp_h.write(slurm_submit_script)
             await temp_h.flush()
 
-            remote_slurm_filename = os.path.join(self._current_remote_workdir, slurm_filename)
+            remote_slurm_filename = os.path.join(current_remote_workdir, slurm_filename)
             app_log.debug(f"Copying slurm submit script to remote fs: {remote_slurm_filename} ...")
             await asyncssh.scp(temp_h.name, (conn, remote_slurm_filename))
 
