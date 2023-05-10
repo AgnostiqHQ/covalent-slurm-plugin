@@ -375,7 +375,6 @@ fi
                 else:
                     srun_options_str += f"--{key}" + (f"={value}" if value else "")
 
-            remote_py_filename = os.path.join(self.remote_workdir, py_filename)
             slurm_srun = f"srun{srun_options_str} \\"
 
             if self.srun_append:
@@ -390,6 +389,7 @@ fi
         else:
             slurm_srun = ""
 
+        remote_py_filename = os.path.join(self.remote_workdir, py_filename)
         python_cmd = slurm_srun + f"python {remote_py_filename}"
 
         # runs post-run commands
