@@ -176,9 +176,9 @@ def test_format_py_script():
         ssh_key_file=SSH_KEY_FILE,
         cert_file=CERT_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=60,
         options={},
         cache_dir="~/.cache/covalent",
+        poll_freq=60,
     )
 
     dispatch_id = "148dedae-1b58-3870-z08d-db89bceec915"
@@ -205,8 +205,8 @@ def test_format_submit_script_default():
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir=remote_workdir,
-        poll_freq=60,
         cache_dir="~/.cache/covalent",
+        poll_freq=60,
     )
 
     def simple_task(x):
@@ -301,9 +301,9 @@ async def test_failed_submit_script(mocker, conn_mock):
             address="test_address",
             ssh_key_file="/this/file/does/not/exist",
             remote_workdir="/federation/test_user/.cache/covalent",
-            poll_freq=60,
             options={},
             cache_dir="~/.cache/covalent",
+            poll_freq=60,
         )
         await executor._client_connect()
 
@@ -314,9 +314,9 @@ async def test_failed_submit_script(mocker, conn_mock):
             ssh_key_file=SSH_KEY_FILE,
             cert_file="/this/file/does/not/exist",
             remote_workdir="/federation/test_user/.cache/covalent",
-            poll_freq=60,
             options={},
             cache_dir="~/.cache/covalent",
+            poll_freq=60,
         )
         await executor._client_connect()
 
@@ -330,9 +330,9 @@ async def test_get_status(proc_mock, conn_mock):
         address="test_address",
         ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=60,
         options={},
         cache_dir="~/.cache/covalent",
+        poll_freq=60,
     )
 
     proc_mock.returncode = 0
@@ -358,10 +358,10 @@ async def test_poll_slurm(proc_mock, conn_mock):
         address="test_address",
         ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=60,
         options={},
         slurm_path="sample_path",
         cache_dir="~/.cache/covalent",
+        poll_freq=60,
     )
 
     proc_mock.returncode = 0
@@ -399,9 +399,9 @@ async def test_query_result(mocker, proc_mock, conn_mock):
         address="test_address",
         ssh_key_file=SSH_KEY_FILE,
         remote_workdir="/federation/test_user/.cache/covalent",
-        poll_freq=60,
         options={"output": "stdout_file", "error": "stderr_file"},
         cache_dir="~/.cache/covalent",
+        poll_freq=60,
     )
 
     # First test when the remote result file is not found by mocking the return code
