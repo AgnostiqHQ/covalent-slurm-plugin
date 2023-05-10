@@ -462,6 +462,7 @@ async def test_query_result(mocker, proc_mock, conn_mock):
         assert stderr == expected_stderr
         pickle_mock.assert_called_once()
 
+
 @pytest.mark.asyncio
 async def test_run_default(mocker, proc_mock, conn_mock):
     """Test calling run works as expected."""
