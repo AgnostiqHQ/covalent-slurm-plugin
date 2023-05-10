@@ -143,7 +143,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
         self.cache_dir = str(Path(cache_dir).expanduser().resolve())
         if not os.path.exists(self.cache_dir):
-            os.mkdirs(self.cache_dir)
+            os.makedirs(self.cache_dir)
 
         # To allow passing empty dictionary
         if options is None:
