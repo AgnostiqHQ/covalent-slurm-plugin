@@ -232,14 +232,12 @@ def test_format_submit_script():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        print(
-            executor_1._format_submit_script(
-                python_version=python_version, py_filename=py_filename
-            )
-        )
+        submit_script_str = executor_1._format_submit_script(python_version, py_filename)
+        print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
-
+    assert "conda activate my-conda-env" in submit_script_str
+    assert "source $HOME/.newbashrc" in submit_script_str
 
 def test_format_submit_script_no_conda():
     """Test that the shell script (in string form) which is to be submitted on
@@ -250,6 +248,7 @@ def test_format_submit_script_no_conda():
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         conda_env="",
+        bashrc_path=False,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=60,
         cache_dir="~/.cache/covalent",
@@ -274,6 +273,7 @@ def test_format_submit_script_no_conda():
         assert False, f"Exception while running _format_submit_script with default options: {exc}"
 
     assert "conda" not in submit_script_str
+    assert "source" not in submit_script_str
 
 
 @pytest.mark.asyncio
