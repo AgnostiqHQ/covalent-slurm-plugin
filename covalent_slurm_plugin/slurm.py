@@ -569,9 +569,13 @@ with open("{result_filename}", "wb") as f:
         node_id = task_metadata["node_id"]
         results_dir = task_metadata["results_dir"]
         task_results_dir = os.path.join(results_dir, dispatch_id)
-        current_remote_workdir = os.path.join(
-            self.remote_workdir, dispatch_id, "node_" + str(node_id)
-        )
+
+        if self.create_unique_workdir:
+            current_remote_workdir = os.path.join(
+                self.remote_workdir, dispatch_id, "node_" + str(node_id)
+            )
+        else:
+            current_remote_workdir = self.remote_workdir
 
         result_filename = f"result-{dispatch_id}-{node_id}.pkl"
         slurm_filename = f"slurm-{dispatch_id}-{node_id}.sh"
