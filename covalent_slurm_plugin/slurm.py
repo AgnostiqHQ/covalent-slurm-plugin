@@ -73,16 +73,17 @@ class SlurmExecutor(AsyncBaseExecutor):
         address: Remote address or hostname of the Slurm login node.
         ssh_key_file: Private RSA key used to authenticate over SSH.
         cert_file: Certificate file used to authenticate over SSH, if required.
+        sshproxy: <Fill In Missing Docstring>
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function.
         cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
+        prerun_commands: List of shell commands to run before running the pickled function.
+        postrun_commands: List of shell commands to run after running the pickled function.
         use_srun: Whether or not to run the pickled Python function with srun. If your function itself makes srun or mpirun calls, set this to False.
         srun_options: Dictionary of parameters passed to srun inside submit script.
         srun_append: Command nested into srun call.
-        prerun_commands: List of shell commands to run before submitting with srun.
-        postrun_commands: List of shell commands to run after submitting with srun.
         poll_freq: Frequency with which to poll a submitted job.
         cleanup: Whether to perform cleanup or not on remote machine.
     """
@@ -93,17 +94,17 @@ class SlurmExecutor(AsyncBaseExecutor):
         address: str = None,
         ssh_key_file: str = None,
         cert_file: str = None,
+        sshproxy: Dict = None,
         remote_workdir: str = None,
         slurm_path: str = None,
         conda_env: str = None,
         cache_dir: str = None,
         options: Dict = None,
-        sshproxy: Dict = None,
+        prerun_commands: List[str] = None,
+        postrun_commands: List[str] = None,
         use_srun: bool = None,
         srun_options: Dict = None,
         srun_append: str = None,
-        prerun_commands: List[str] = None,
-        postrun_commands: List[str] = None,
         poll_freq: int = None,
         cleanup: bool = None,
         **kwargs,
