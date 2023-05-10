@@ -247,7 +247,7 @@ def test_format_submit_script_no_conda():
         username="test_user",
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
-        conda_env="",
+        conda_env=False,
         remote_workdir="/federation/test_user/.cache/covalent",
         poll_freq=60,
         cache_dir="~/.cache/covalent",
