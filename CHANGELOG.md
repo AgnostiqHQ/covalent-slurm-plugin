@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed a bug where `cleanup = False` would be ignored.
+- Fixed a bug where if `cache_dir` was not present, Covalent would crash.
 
 ## [0.12.1] - 2023-05-05
 
