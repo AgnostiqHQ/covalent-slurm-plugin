@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [UNRELEASED]
 
 ### Changed
+
 - Removed automatic sourcing of `$HOME/.bashrc` from the SLURM submit script.
 
 ### Fixed
+
 - Does not put conda-related lines in SLURM script if `conda_env` is set to `False`
 - Changed default config value of `conda_env` from `None` to `"base"`, but it has the same effect as before.
 
