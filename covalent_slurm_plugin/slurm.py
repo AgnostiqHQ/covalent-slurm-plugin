@@ -202,7 +202,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         if not self.ssh_key_file:
             raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
-        
+
         if self.sshproxy and self.address in self.sshproxy["hosts"]:
             try:
                 import oathtool
