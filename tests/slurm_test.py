@@ -192,6 +192,7 @@ def test_format_submit_script_default():
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
     assert "conda activate" in submit_script_str
+    assert "$HOME/.bashrc" in submit_script_str
 
 
 def test_format_submit_script():
@@ -204,6 +205,7 @@ def test_format_submit_script():
         ssh_key_file="~/.ssh/id_rsa",
         remote_workdir="/scratch/user/experiment1",
         conda_env="my-conda-env",
+        bashrc_path="$HOME/.newbashrc",
         options={"nodes": 1, "c": 8, "qos": "regular"},
         srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
         srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",

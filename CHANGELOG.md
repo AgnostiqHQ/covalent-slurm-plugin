@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+
+- A new config variable, `bashrc_path`, which is the path to the bashrc script to source.
+
 ### Changed
 
 - Removed automatic sourcing of `$HOME/.bashrc` from the SLURM submit script.

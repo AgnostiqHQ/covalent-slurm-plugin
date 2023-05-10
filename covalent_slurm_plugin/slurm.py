@@ -49,6 +49,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "remote_workdir": "covalent-workdir",
     "slurm_path": None,
     "conda_env": "base",
+    "bashrc_path":"$HOME/.bashrc",
     "cache_dir": str(Path(get_config("dispatcher.cache_dir")).expanduser().resolve()),
     "options": {
         "parsable": "",
@@ -75,6 +76,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function. Use "base" for the base environment or False for no conda.
+        bashrc_path: Path to the bashrc file to source before running the function.
         cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
         srun_options: Dictionary of parameters passed to srun inside submit script.
@@ -94,6 +96,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         remote_workdir: str = None,
         slurm_path: str = None,
         conda_env: Union[str, bool] = None,
+        bashrc_path: str = None,
         cache_dir: str = None,
         options: Dict = None,
         sshproxy: Dict = None,
@@ -132,6 +135,11 @@ class SlurmExecutor(AsyncBaseExecutor):
             )
         except KeyError:
             self.conda_env = None
+
+        try:
+            self.bashrc_path = bashrc_path or get_config("executors.slurm.bashrc_path")
+        except KeyError:
+            self.bashrc_path = None
 
         cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
         self.cache_dir = str(Path(cache_dir).expanduser().resolve())
@@ -333,6 +341,12 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         conda_env_clean = "" if self.conda_env == "base" else self.conda_env
 
+        # Source commands
+        if self.bashrc_path:
+            source_text = f"source {self.bashrc_path}"
+        else:
+            source_text = ""
+
         # sets up conda environment
         if self.conda_env:
             slurm_conda = f"""
@@ -394,7 +408,7 @@ fi
         slurm_body = "\n".join([slurm_prerun_commands, slurm_srun, slurm_postrun_commands, "wait"])
 
         # assemble script
-        return "".join([slurm_preamble, slurm_conda, slurm_python_version, slurm_body])
+        return "".join([slurm_preamble, source_text, slurm_conda, slurm_python_version, slurm_body])
 
     def _format_py_script(
         self,
