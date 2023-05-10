@@ -54,6 +54,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
         "parsable": "",
     },
     "poll_freq": 60,
+    "use_srun": True,
     "srun_options": {},
     "srun_append": None,
     "prerun_commands": None,
@@ -77,6 +78,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         conda_env: Name of conda environment on which to run the function.
         cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
+        use_srun: Whether or not to run the Python file with srun. If your Python script itself makes srun or mpirun calls, set this to False.
         srun_options: Dictionary of parameters passed to srun inside submit script.
         srun_append: Command nested into srun call.
         prerun_commands: List of shell commands to run before submitting with srun.
@@ -97,6 +99,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         cache_dir: str = None,
         options: Dict = None,
         sshproxy: Dict = None,
+        use_srun: bool = None,
         srun_options: Dict = None,
         srun_append: str = None,
         prerun_commands: List[str] = None,
@@ -145,6 +148,8 @@ class SlurmExecutor(AsyncBaseExecutor):
             except KeyError:
                 sshproxy = {}
         self.sshproxy = deepcopy(sshproxy)
+
+        self.use_srun = get_config("executors.slurm.use_srun") if use_srun is None else use_srun
 
         if srun_options is None:
             srun_options = get_config("executors.slurm.srun_options")
@@ -360,28 +365,30 @@ fi
         else:
             slurm_prerun_commands = ""
 
-        # uses srun to run script calling pickled function
-        srun_options_str = ""
-        for key, value in self.srun_options.items():
-            srun_options_str += " "
-            if len(key) == 1:
-                srun_options_str += f"-{key}" + (f" {value}" if value else "")
+        if self.use_srun:
+            # uses srun to run script calling pickled function
+            srun_options_str = ""
+            for key, value in self.srun_options.items():
+                srun_options_str += " "
+                if len(key) == 1:
+                    srun_options_str += f"-{key}" + (f" {value}" if value else "")
+                else:
+                    srun_options_str += f"--{key}" + (f"={value}" if value else "")
+
+            remote_py_filename = os.path.join(self.remote_workdir, py_filename)
+            slurm_srun = f"srun{srun_options_str} \\"
+
+            if self.srun_append:
+                # insert any appended commands
+                slurm_srun += f"""
+    {self.srun_append} \\
+    """
             else:
-                srun_options_str += f"--{key}" + (f"={value}" if value else "")
+                slurm_srun += """
+    """
 
-        remote_py_filename = os.path.join(self.remote_workdir, py_filename)
-        slurm_srun = f"srun{srun_options_str} \\"
-
-        if self.srun_append:
-            # insert any appended commands
-            slurm_srun += f"""
-{self.srun_append} \\
-"""
         else:
-            slurm_srun += """
-"""
-
-        slurm_srun += f"python {remote_py_filename}"
+            python_cmd = slurm_srun + f"python {remote_py_filename}"
 
         # runs post-run commands
         if self.postrun_commands:
@@ -390,7 +397,7 @@ fi
             slurm_postrun_commands = ""
 
         # assemble commands into slurm body
-        slurm_body = "\n".join([slurm_prerun_commands, slurm_srun, slurm_postrun_commands, "wait"])
+        slurm_body = "\n".join([slurm_prerun_commands, python_cmd, slurm_postrun_commands, "wait"])
 
         # assemble script
         return "".join([slurm_preamble, slurm_conda, slurm_python_version, slurm_body])
