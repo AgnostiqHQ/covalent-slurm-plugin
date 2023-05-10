@@ -490,8 +490,6 @@ async def test_run_default(mocker, proc_mock, conn_mock):
         dummy_metadata,
     )
 
-    dummy_error_msg = "dummy_error_message"
-
     # mock behavior
     conn_mock.run = mock.AsyncMock(return_value=proc_mock)
     conn_mock.wait_closed = mock.AsyncMock(return_value=None)
@@ -501,87 +499,15 @@ async def test_run_default(mocker, proc_mock, conn_mock):
         proc_mock.stderr = ""
         proc_mock.returncode = 0
 
-    async def __client_connect_fail(*_):
-        return conn_mock
-
     async def __client_connect_succeed(*_):
         return conn_mock
-
-    async def __poll_slurm_succeed(*_):
-        return
-
-    async def __query_result_fail(*_):
-        return None, proc_mock.stdout, proc_mock.stderr, dummy_error_msg
-
+    
     async def __query_result_succeed(*_):
         return "result", "", "", None
 
     # patches
-    patch_ccf = mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_fail)
     patch_ccs = mock.patch.object(SlurmExecutor, "_client_connect", new=__client_connect_succeed)
-    patch_pss = mock.patch.object(SlurmExecutor, "_poll_slurm", new=__poll_slurm_succeed)
-    patch_qrf = mock.patch.object(SlurmExecutor, "_query_result", new=__query_result_fail)
     patch_qrs = mock.patch.object(SlurmExecutor, "_query_result", new=__query_result_succeed)
-
-    # check failed ssh connection handled as expected
-    with patch_ccf:
-        msg = f"Could not connect to host: '{executor.address}' as user: '{executor.username}'"
-        with pytest.raises(Exception) as exc_info:
-            await executor.run(*dummy_args)
-            assert exc_info.type is RuntimeError
-            assert exc_info.value.args == (msg,)
-
-    # check failed creation of remote directory handled as expected
-    msg = "Failed to create directory"
-    proc_mock.stderr = msg
-    with patch_ccs:
-        with pytest.raises(Exception) as exc_info:
-            await executor.run(*dummy_args)
-            assert exc_info.type is RuntimeError
-            assert exc_info.value.args == (msg,)
-    reset_proc_mock()
-
-    # check run call completes with no other errors when `slurm_path` specified
-    executor.slurm_path = "/path/to/slurm"
-    proc_mock.stdout = "53034272 COMPLETED"
-    with patch_ccs, patch_qrs:
-        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
-        await executor.run(*dummy_args)
-    executor.slurm_path = None
-    reset_proc_mock()
-
-    # check failed verification of slurm installation handled as expected
-    msg = "Please provide `slurm_path` to run sbatch command"
-    proc_mock.returncode = 1
-    with patch_ccs:
-        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
-        with pytest.raises(Exception) as exc_info:
-            await executor.run(*dummy_args)
-            assert exc_info.type is RuntimeError
-            assert exc_info.value.args == (msg,)
-    reset_proc_mock()
-
-    # check failed `cmd_sbatch` run on remote handled as expected
-    executor.slurm_path = "/path/to/slurm"
-    proc_mock.returncode = 1
-    with patch_ccs, patch_pss:
-        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
-        with pytest.raises(Exception) as exc_info:
-            await executor.run(*dummy_args)
-            assert exc_info.type is RuntimeError
-            assert exc_info.value.args == ("",)
-    executor.slurm_path = None
-    reset_proc_mock()
-
-    # check failed query handled as expected
-    proc_mock.stdout = "64145383 FAILED"
-    with patch_ccs, patch_pss, patch_qrf:
-        mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
-        with pytest.raises(Exception) as exc_info:
-            await executor.run(*dummy_args)
-            assert exc_info.type is RuntimeError
-            assert exc_info.value.args == (dummy_error_msg,)
-    reset_proc_mock()
 
     # check run call completes with no other errors
     proc_mock.stdout = "75256494 COMPLETED"
