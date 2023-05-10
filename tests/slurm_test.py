@@ -187,9 +187,7 @@ def test_format_py_script():
     result_filename = f"result-{dispatch_id}-{task_id}.pkl"
 
     try:
-        py_script_str = executor_0._format_py_script(
-            func_filename, result_filename
-        )
+        py_script_str = executor_0._format_py_script(func_filename, result_filename)
         print(py_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_py_script: {exc}"
@@ -201,7 +199,7 @@ def test_format_submit_script_default():
     """Test that the shell script (in string form) which is to be submitted on
     the remote server is created with no errors."""
 
-    remote_workdir="/federation/test_user/.cache/covalent"
+    remote_workdir = "/federation/test_user/.cache/covalent"
     executor_0 = SlurmExecutor(
         username="test_user",
         address="test_address",
@@ -225,7 +223,8 @@ def test_format_submit_script_default():
 
     try:
         submit_script_str = executor_0._format_submit_script(
-            python_version, py_filename,remote_workdir)
+            python_version, py_filename, remote_workdir
+        )
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script with default options: {exc}"
@@ -235,14 +234,14 @@ def test_format_submit_script_default():
     assert submit_script_str.startswith(
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
-    assert "--chdir="+remote_workdir in submit_script_str
+    assert "--chdir=" + remote_workdir in submit_script_str
 
 
 def test_format_submit_script():
     """Test that the shell script (in string form) which is to be submitted on
     the remote server is created with no errors."""
 
-    remote_workdir="/scratch/user/experiment1"
+    remote_workdir = "/scratch/user/experiment1"
     executor_1 = SlurmExecutor(
         username="test_user",
         address="test_address",
@@ -274,10 +273,10 @@ def test_format_submit_script():
     dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
     task_id = 3
     py_filename = f"script-{dispatch_id}-{task_id}.py"
-    current_remote_workdir = os.path.join(remote_workdir,dispatch_id,"node_"+str(task_id))
+    current_remote_workdir = os.path.join(remote_workdir, dispatch_id, "node_" + str(task_id))
     try:
         submit_script_str = executor_1._format_submit_script(
-            python_version, py_filename,current_remote_workdir
+            python_version, py_filename, current_remote_workdir
         )
         print(submit_script_str)
     except Exception as exc:
@@ -287,7 +286,7 @@ def test_format_submit_script():
         assert prerun_command in submit_script_str
     for postrun_command in executor_1.postrun_commands:
         assert postrun_command in submit_script_str
-    assert "--chdir="+current_remote_workdir in submit_script_str
+    assert "--chdir=" + current_remote_workdir in submit_script_str
 
 
 @pytest.mark.asyncio
