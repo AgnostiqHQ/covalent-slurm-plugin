@@ -239,6 +239,7 @@ def test_format_submit_script():
     assert "conda activate my-conda-env" in submit_script_str
     assert "source $HOME/.newbashrc" in submit_script_str
 
+
 def test_format_submit_script_no_conda():
     """Test that the shell script (in string form) which is to be submitted on
     the remote server is created with no errors with no Conda."""
