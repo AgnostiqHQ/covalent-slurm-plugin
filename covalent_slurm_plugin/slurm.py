@@ -584,8 +584,13 @@ with open("{result_filename}", "wb") as f:
         # Create the remote directory
         app_log.debug(f"Creating remote work directory {self._current_remote_workdir} ...")
         cmd_mkdir_remote = f"mkdir -p {self._current_remote_workdir}"
-        proc_mkdir_cache = await conn.run(cmd_mkdir_remote)
+        cmd_mkdir_cache = f"mkdir -p {self.cache_dir}"
 
+        proc_mkdir_remote = await conn.run(cmd_mkdir_remote)
+        if client_err := proc_mkdir_remote.stderr.strip():
+            raise RuntimeError(client_err)
+
+        proc_mkdir_cache = await conn.run(cmd_mkdir_cache)
         if client_err := proc_mkdir_cache.stderr.strip():
             raise RuntimeError(client_err)
 
