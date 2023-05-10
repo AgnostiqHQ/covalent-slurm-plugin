@@ -595,7 +595,7 @@ with open("{result_filename}", "wb") as f:
             await temp_f.write(pickle.dumps((function, args, kwargs)))
             await temp_f.flush()
 
-            remote_func_filename = os.path.join(self._current_remote_workdir, func_filename)
+            remote_func_filename = os.path.join(self.remote_workdir, func_filename)
             app_log.debug(f"Copying pickled function to remote fs: {remote_func_filename} ...")
             await asyncssh.scp(temp_f.name, (conn, remote_func_filename))
 
@@ -606,9 +606,7 @@ with open("{result_filename}", "wb") as f:
             await temp_g.write(python_exec_script)
             await temp_g.flush()
 
-            remote_py_script_filename = os.path.join(
-                self._current_remote_workdir, py_script_filename
-            )
+            remote_py_script_filename = os.path.join(self.remote_workdir, py_script_filename)
             app_log.debug(f"Copying python run-function to remote fs: {remote_py_script_filename}")
             await asyncssh.scp(temp_g.name, (conn, remote_py_script_filename))
 
@@ -682,7 +680,7 @@ with open("{result_filename}", "wb") as f:
                     remote_slurm_filename=self._remote_slurm_filename,
                     remote_py_filename=self._remote_py_script_filename,
                     remote_result_filename=os.path.join(
-                        self._current_remote_workdir, self._result_filename
+                        self.remote_workdir, self._result_filename
                     ),
                     remote_stdout_filename=self.options["output"],
                     remote_stderr_filename=self.options["error"],
