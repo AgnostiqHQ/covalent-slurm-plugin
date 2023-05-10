@@ -191,7 +191,7 @@ def test_format_submit_script_default():
     assert submit_script_str.startswith(
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
-    assert "conda" in submit_script_str
+    assert "conda activate" in submit_script_str
 
 
 def test_format_submit_script():
@@ -230,14 +230,13 @@ def test_format_submit_script():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        print(
-            executor_1._format_submit_script(
-                python_version=python_version, py_filename=py_filename
-            )
+        submit_script_str = executor_1._format_submit_script(
+            python_version, py_filename, current_remote_workdir
         )
+        print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
-
+    assert "conda activate my-conda-env" in submit_script_str
 
 def test_format_submit_script_no_conda():
     """Test that the shell script (in string form) which is to be submitted on
