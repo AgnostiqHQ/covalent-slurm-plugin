@@ -50,7 +50,6 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "create_unique_workdir": False,
     "slurm_path": None,
     "conda_env": None,
-    "cache_dir": str(Path(get_config("dispatcher.cache_dir")).expanduser().resolve()),
     "options": {
         "parsable": "",
     },
@@ -58,6 +57,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "srun_append": None,
     "prerun_commands": None,
     "postrun_commands": None,
+    "cache_dir": str(Path(get_config("dispatcher.cache_dir")).expanduser().resolve()),
     "poll_freq": 60,
     "cleanup": True,
 }
@@ -77,12 +77,12 @@ class SlurmExecutor(AsyncBaseExecutor):
         create_unique_workdir: Whether to create a unique working (sub)directory for each task.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function.
-        cache_dir: Local cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
         srun_options: Dictionary of parameters passed to srun inside submit script.
         srun_append: Command nested into srun call.
         prerun_commands: List of shell commands to run before submitting with srun.
         postrun_commands: List of shell commands to run after submitting with srun.
+        cache_dir: Local cache directory used by this executor for temporary files.
         poll_freq: Frequency with which to poll a submitted job.
         cleanup: Whether to perform cleanup or not on remote machine.
     """
