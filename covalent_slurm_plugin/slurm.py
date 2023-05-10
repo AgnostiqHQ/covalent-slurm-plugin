@@ -175,10 +175,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             print("Polling frequency will be increased to the minimum for Slurm: 60 seconds.")
             self.poll_freq = 60
 
-        if cleanup is None:
-            self.cleanup = get_config("executors.slurm.cleanup")
-        else:
-            self.cleanup = cleanup
+        self.cleanup = get_config("executors.slurm.cleanup") if cleanup is None else cleanup
 
         # Ensure that the slurm data is parsable
         if "parsable" not in self.options:
