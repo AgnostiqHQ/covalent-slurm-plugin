@@ -75,7 +75,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         cert_file: Certificate file used to authenticate over SSH, if required (usually has extension .pub).
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
-        conda_env: Name of conda environment on which to run the function. Use "base" for the base environment or False for no conda.
+        conda_env: Name of conda environment on which to run the function. Use "base" for the base environment or "" for no conda.
         bashrc_path: Path to the bashrc file to source before running the function.
         cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
@@ -95,7 +95,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         cert_file: str = None,
         remote_workdir: str = None,
         slurm_path: str = None,
-        conda_env: Union[str, bool] = None,
+        conda_env: str = None,
         bashrc_path: str = None,
         cache_dir: str = None,
         options: Dict = None,
@@ -343,7 +343,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         # Source commands
         if self.bashrc_path:
-            source_text = f"source {self.bashrc_path}"
+            source_text = f"source {self.bashrc_path}\n"
         else:
             source_text = ""
 
