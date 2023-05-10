@@ -73,7 +73,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         address: Remote address or hostname of the Slurm login node.
         ssh_key_file: Private RSA key used to authenticate over SSH.
         cert_file: Certificate file used to authenticate over SSH, if required.
-        sshproxy: <Fill In Missing Docstring>
+        sshproxy: Dictionary of parameters for sshproxy, namely the "hosts": List[str], "username": str, and "secret": str.
         remote_workdir: Working directory on the remote cluster.
         slurm_path: Path to the slurm commands if they are not found automatically.
         conda_env: Name of conda environment on which to run the function.
