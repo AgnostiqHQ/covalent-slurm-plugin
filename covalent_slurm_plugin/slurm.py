@@ -78,7 +78,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         conda_env: Name of conda environment on which to run the function.
         cache_dir: Cache directory used by this executor for temporary files.
         options: Dictionary of parameters used to build a Slurm submit script.
-        use_srun: Whether or not to run the Python file with srun. If your Python script itself makes srun or mpirun calls, set this to False.
+        use_srun: Whether or not to run the pickled Python function with srun. If your function itself makes srun or mpirun calls, set this to False.
         srun_options: Dictionary of parameters passed to srun inside submit script.
         srun_append: Command nested into srun call.
         prerun_commands: List of shell commands to run before submitting with srun.
