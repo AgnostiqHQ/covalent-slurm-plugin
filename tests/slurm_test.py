@@ -191,6 +191,7 @@ def test_format_submit_script_default():
     assert submit_script_str.startswith(
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
+    assert "srun" in submit_script_str
 
 
 def test_format_submit_script():
