@@ -192,7 +192,7 @@ def test_format_submit_script_default():
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
     assert "conda activate" in submit_script_str
-    assert "$HOME/.bashrc" in submit_script_str
+    assert "source $HOME/.bashrc" in submit_script_str
 
 
 def test_format_submit_script():
