@@ -104,7 +104,7 @@ def test_init():
     create_unique_workdir = True
     slurm_path = "/opt/test/slurm/path"
     conda_env = "test_env"
-    cache_dir = "/test/cache/dir"
+    cache_dir = "~/test/cache/dir"
     options = {"account": "test"}
     srun_options = {"slurmd-debug": 4}
     srun_append = "test"
