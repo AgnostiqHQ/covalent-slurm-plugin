@@ -127,7 +127,9 @@ class SlurmExecutor(AsyncBaseExecutor):
             self.slurm_path = None
 
         try:
-            self.conda_env = conda_env or get_config("executors.slurm.conda_env")
+            self.conda_env = (
+                get_config("executors.slurm.conda_env") if conda_env is None else conda_env
+            )
         except KeyError:
             self.conda_env = None
 
