@@ -49,7 +49,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "remote_workdir": "covalent-workdir",
     "slurm_path": None,
     "conda_env": "base",
-    "bashrc_path":"$HOME/.bashrc",
+    "bashrc_path": "$HOME/.bashrc",
     "cache_dir": str(Path(get_config("dispatcher.cache_dir")).expanduser().resolve()),
     "options": {
         "parsable": "",
@@ -408,7 +408,9 @@ fi
         slurm_body = "\n".join([slurm_prerun_commands, slurm_srun, slurm_postrun_commands, "wait"])
 
         # assemble script
-        return "".join([slurm_preamble, source_text, slurm_conda, slurm_python_version, slurm_body])
+        return "".join(
+            [slurm_preamble, source_text, slurm_conda, slurm_python_version, slurm_body]
+        )
 
     def _format_py_script(
         self,
