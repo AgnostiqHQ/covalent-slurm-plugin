@@ -336,7 +336,6 @@ class SlurmExecutor(AsyncBaseExecutor):
         # sets up conda environment
         if self.conda_env:
             slurm_conda = f"""
-            source $HOME/.bashrc
             conda activate {conda_env_clean}
             retval=$?
             if [ $retval -ne 0 ] ; then

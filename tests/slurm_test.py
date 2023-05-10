@@ -273,7 +273,6 @@ def test_format_submit_script_no_conda():
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script with default options: {exc}"
 
-    assert "source $HOME/.bashrc" not in submit_script_str
     assert "conda" not in submit_script_str
 
 
