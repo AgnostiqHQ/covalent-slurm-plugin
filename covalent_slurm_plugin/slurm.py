@@ -555,7 +555,7 @@ with open("{result_filename}", "wb") as f:
 
     async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
         """Run a function on a remote machine using Slurm.
-        
+
         Args:
             function: Function to be executed.
             args: List of positional arguments to be passed to the function.
@@ -690,10 +690,10 @@ with open("{result_filename}", "wb") as f:
 
     async def teardown(self, task_metadata: Dict):
         """Perform cleanup on remote machine.
-        
+
         Args:
             task_metadata: Dictionary of metadata associated with the task.
-        
+
         Returns:
             None
         """
