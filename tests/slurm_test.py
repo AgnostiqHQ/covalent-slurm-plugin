@@ -82,7 +82,7 @@ def test_init():
     assert executor.cert_file is None
     assert executor.remote_workdir == "covalent-workdir"
     assert executor.slurm_path is None
-    assert executor.conda_env == ""
+    assert executor.conda_env == "base"
     assert executor.poll_freq == 60
     assert executor.cache_dir == str(
         Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
