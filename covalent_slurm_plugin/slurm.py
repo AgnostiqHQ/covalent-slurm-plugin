@@ -384,7 +384,7 @@ fi
             else:
                 srun_options_str += f"--{key}" + (f"={value}" if value else "")
 
-        remote_py_filename = os.path.join(self._current_remote_workdir, py_filename)
+        remote_py_filename = os.path.join(self.remote_workdir, py_filename)
         slurm_srun = f"srun{srun_options_str} \\"
 
         if self.srun_append:
