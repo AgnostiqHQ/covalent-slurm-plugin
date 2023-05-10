@@ -426,8 +426,8 @@ fi
         Returns:
             script: String object containing a script parsable by sbatch.
         """
-        func_filename = os.path.join(self.self.remote_workdir, func_filename)
-        result_filename = os.path.join(self.self.remote_workdir, result_filename)
+        func_filename = os.path.join(self.remote_workdir, func_filename)
+        result_filename = os.path.join(self.remote_workdir, result_filename)
         return f"""
 import cloudpickle as pickle
 
