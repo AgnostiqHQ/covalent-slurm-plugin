@@ -585,7 +585,7 @@ with open("{result_filename}", "wb") as f:
         app_log.debug(f"Creating remote work directory {current_remote_workdir} ...")
         cmd_mkdir_remote = f"mkdir -p {current_remote_workdir}"
         proc_mkdir_remote = await conn.run(cmd_mkdir_remote)
-        
+
         if client_err := proc_mkdir_remote.stderr.strip():
             raise RuntimeError(client_err)
 
