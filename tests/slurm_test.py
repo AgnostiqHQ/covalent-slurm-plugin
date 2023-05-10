@@ -146,7 +146,7 @@ def test_init():
     assert executor.create_unique_workdir == create_unique_workdir
     assert executor.slurm_path == slurm_path
     assert executor.conda_env == conda_env
-    assert executor.cache_dir == cache_dir
+    assert executor.cache_dir == cache_dir.expanduser().resolve()
     assert executor.options == {"account": "test", "parsable": ""}
     assert executor.srun_options == srun_options
     assert executor.srun_append == srun_append
