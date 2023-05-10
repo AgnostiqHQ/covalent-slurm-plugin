@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## Changed
+- Does not put conda-related lines in SLURM script if `conda_env` is set to `False`
+- Changed default config value of `conda_env` from `None` to `""`, but it has the same effect has before.
+
 ## [0.12.1] - 2023-05-05
 
 ### Fixed

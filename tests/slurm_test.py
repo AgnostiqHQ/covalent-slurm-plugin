@@ -82,7 +82,7 @@ def test_init():
     assert executor.cert_file is None
     assert executor.remote_workdir == "covalent-workdir"
     assert executor.slurm_path is None
-    assert executor.conda_env is None
+    assert executor.conda_env == ""
     assert executor.poll_freq == 60
     assert executor.cache_dir == str(
         Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
@@ -191,6 +191,7 @@ def test_format_submit_script_default():
     assert submit_script_str.startswith(
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
+    assert "conda" in submit_script_str
 
 
 def test_format_submit_script():
@@ -236,6 +237,44 @@ def test_format_submit_script():
         )
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
+
+
+def test_format_submit_script_no_conda():
+    """Test that the shell script (in string form) which is to be submitted on
+    the remote server is created with no errors with no Conda."""
+
+    executor_2 = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        conda_env=False,
+        remote_workdir="/federation/test_user/.cache/covalent",
+        poll_freq=60,
+        cache_dir="~/.cache/covalent",
+    )
+
+    def simple_task(x):
+        return x
+
+    transport_function = partial(
+        wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5)
+    )
+    python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
+
+    dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
+    task_id = 3
+    py_filename = f"script-{dispatch_id}-{task_id}.py"
+
+    try:
+        submit_script_str = executor_2._format_submit_script(
+            python_version=python_version, py_filename=py_filename
+        )
+        print(submit_script_str)
+    except Exception as exc:
+        assert False, f"Exception while running _format_submit_script with default options: {exc}"
+
+    assert "source $HOME/.bashrc" not in submit_script_str
+    assert "conda" not in submit_script_str
 
 
 @pytest.mark.asyncio
