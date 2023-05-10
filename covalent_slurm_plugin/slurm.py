@@ -316,10 +316,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         await conn.run(f"rm {remote_stderr_filename}")
 
     def _format_submit_script(
-        self,
-        python_version: str,
-        py_filename: str,
-        current_remote_workdir:str
+        self, python_version: str, py_filename: str, current_remote_workdir: str
     ) -> str:
         """Create the SLURM that defines the job, uses srun to run the python script.
 
@@ -612,7 +609,9 @@ with open("{result_filename}", "wb") as f:
 
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_h:
             # Format the SLURM submit script, write to file, and copy to remote filesystem
-            slurm_submit_script = self._format_submit_script(py_version_func, py_script_filename,current_remote_workdir)
+            slurm_submit_script = self._format_submit_script(
+                py_version_func, py_script_filename, current_remote_workdir
+            )
             app_log.debug("Writing slurm submit script to tempfile...")
             await temp_h.write(slurm_submit_script)
             await temp_h.flush()
