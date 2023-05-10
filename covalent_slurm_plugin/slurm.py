@@ -116,6 +116,15 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
 
+        if not self.username:
+            raise ValueError("username is a required parameter in the Slurm plugin.")
+
+        if not self.address:
+            raise ValueError("address is a required parameter in the Slurm plugin.")
+
+        if not self.ssh_key_file:
+            raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
+
         try:
             self.cert_file = cert_file or get_config("executors.slurm.cert_file")
             self.cert_file = str(Path(self.cert_file).expanduser().resolve())
@@ -192,15 +201,6 @@ class SlurmExecutor(AsyncBaseExecutor):
         Returns:
             The connection object
         """
-
-        if not self.username:
-            raise ValueError("username is a required parameter in the Slurm plugin.")
-
-        if not self.address:
-            raise ValueError("address is a required parameter in the Slurm plugin.")
-
-        if not self.ssh_key_file:
-            raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
 
         if self.sshproxy and self.address in self.sshproxy["hosts"]:
             try:
