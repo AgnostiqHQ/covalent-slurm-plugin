@@ -297,6 +297,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         Function to perform cleanup on remote machine
 
         Args:
+            conn: SSH connection object
             remote_func_filename: Function file on remote machine
             remote_slurm_filename: Slurm script file on remote machine
             remote_py_filename: Python script file on remote machine
@@ -316,15 +317,14 @@ class SlurmExecutor(AsyncBaseExecutor):
         await conn.run(f"rm {remote_stderr_filename}")
 
     def _format_submit_script(
-        self,
-        python_version: str,
-        py_filename: str,
-        current_remote_workdir:str
+        self, python_version: str, py_filename: str, current_remote_workdir: str
     ) -> str:
         """Create the SLURM that defines the job, uses srun to run the python script.
 
         Args:
             python_version: Python version required by the pickled function.
+            py_filename: Name of the python script.
+            current_remote_workdir: Current working directory on the remote machine.
 
         Returns:
             script: String object containing a script parsable by sbatch.
@@ -453,6 +453,7 @@ with open("{result_filename}", "wb") as f:
             info_dict: a dictionary containing all necessary parameters needed to query the
                 status of the execution. Required keys in the dictionary are:
                     A string mapping "job_id" to Slurm job ID.
+            conn: SSH connection object.
 
         Returns:
             status: String describing the job status.
@@ -485,6 +486,7 @@ with open("{result_filename}", "wb") as f:
 
         Args:
             job_id: Slurm job ID.
+            conn: SSH connection object.
 
         Returns:
             None
@@ -513,7 +515,7 @@ with open("{result_filename}", "wb") as f:
         Args:
             result_filename: Name of the pickled result file.
             task_results_dir: Directory on the Covalent server where the result will be copied.
-
+            conn: SSH connection object.
         Returns:
             result: Task result.
         """
@@ -552,6 +554,17 @@ with open("{result_filename}", "wb") as f:
         return result, stdout, stderr, exception
 
     async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
+        """Run a function on a remote machine using Slurm.
+        
+        Args:
+            function: Function to be executed.
+            args: List of positional arguments to be passed to the function.
+            kwargs: Dictionary of keyword arguments to be passed to the function.
+            task_metadata: Dictionary of metadata associated with the task.
+
+        Returns:
+            result: Result object containing the result of the function execution.
+        """
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
         results_dir = task_metadata["results_dir"]
@@ -612,7 +625,9 @@ with open("{result_filename}", "wb") as f:
 
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_h:
             # Format the SLURM submit script, write to file, and copy to remote filesystem
-            slurm_submit_script = self._format_submit_script(py_version_func, py_script_filename,current_remote_workdir)
+            slurm_submit_script = self._format_submit_script(
+                py_version_func, py_script_filename, current_remote_workdir
+            )
             app_log.debug("Writing slurm submit script to tempfile...")
             await temp_h.write(slurm_submit_script)
             await temp_h.flush()
@@ -670,6 +685,14 @@ with open("{result_filename}", "wb") as f:
         return result
 
     async def teardown(self, task_metadata: Dict):
+        """Perform cleanup on remote machine.
+        
+        Args:
+            task_metadata: Dictionary of metadata associated with the task.
+        
+        Returns:
+            None
+        """
         if self.cleanup:
             try:
                 app_log.debug("Performing cleanup on remote...")
