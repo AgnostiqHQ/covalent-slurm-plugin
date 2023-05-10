@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A new kwarg `create_unique_workdir` that will create unique subfolders of the type `<DISPATCH ID>/node_<NODE ID>` within `remote_workdir` if set to `True`
 - Increased overall test coverage
 
+### Changed
+- Removed automatic sourcing of `$HOME/.bashrc` from the SLURM submit script.
+
 ### Fixed
 
 - Fixed a bug where `cleanup = False` would be ignored.
