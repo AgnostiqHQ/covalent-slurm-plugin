@@ -124,10 +124,11 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         self.remote_workdir = remote_workdir or get_config("executors.slurm.remote_workdir")
 
-        if create_unique_workdir is None:
-            self.create_unique_workdir = get_config("executors.slurm.create_unique_workdir")
-        else:
-            self.create_unique_workdir = create_unique_workdir
+        self.create_unique_workdir = (
+            get_config("executors.slurm.create_unique_workdir")
+            if create_unique_workdir is None
+            else create_unique_workdir
+        )
 
         # Set the current remote workdir as remote workdir to start, but this will be updated
         self._current_remote_workdir = self.remote_workdir
