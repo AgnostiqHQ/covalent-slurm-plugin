@@ -266,9 +266,7 @@ def test_format_submit_script_no_conda():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        submit_script_str = executor_2._format_submit_script(
-            python_version=python_version, py_filename=py_filename
-        )
+        submit_script_str = executor_2._format_submit_script(python_version, py_filename)
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script with default options: {exc}"
