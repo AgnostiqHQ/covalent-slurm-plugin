@@ -137,7 +137,9 @@ class SlurmExecutor(AsyncBaseExecutor):
             self.conda_env = None
 
         try:
-            self.bashrc_path = get_config("executors.slurm.bashrc_path") if bashrc_path is None else bashrc_path
+            self.bashrc_path = (
+                get_config("executors.slurm.bashrc_path") if bashrc_path is None else bashrc_path
+            )
         except KeyError:
             self.bashrc_path = None
 
