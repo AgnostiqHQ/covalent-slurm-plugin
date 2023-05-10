@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increased overall test coverage
 
 ### Changed
+
 - Moved checking of `username`, `password`, and `ssh_key_file` to the `__init__`
 
 ### Fixed
@@ -39,9 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.0] - 2023-05-02
 
 ### Added
+
 - Added instructions to the `README` for the remote machine's dependencies.
 
 ### Changed
+
 - Automatically apply the `"parsable": ""` option by default if not set by the user.
 
 ## [0.10.0] - 2023-05-01
