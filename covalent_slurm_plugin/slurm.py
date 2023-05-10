@@ -388,7 +388,9 @@ fi
     """
 
         else:
-            python_cmd = slurm_srun + f"python {remote_py_filename}"
+            slurm_srun = ""
+
+        python_cmd = slurm_srun + f"python {remote_py_filename}"
 
         # runs post-run commands
         if self.postrun_commands:
