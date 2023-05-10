@@ -93,7 +93,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         cert_file: str = None,
         remote_workdir: str = None,
         slurm_path: str = None,
-        conda_env: str | bool = None,
+        conda_env: Union[str, bool] = None,
         cache_dir: str = None,
         options: Dict = None,
         sshproxy: Dict = None,
