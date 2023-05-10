@@ -204,6 +204,7 @@ def test_format_submit_script():
         remote_workdir="/scratch/user/experiment1",
         conda_env="my-conda-env",
         options={"nodes": 1, "c": 8, "qos": "regular"},
+        use_srun=False,
         srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
         srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
         prerun_commands=[
@@ -229,13 +230,11 @@ def test_format_submit_script():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        print(
-            executor_1._format_submit_script(
-                python_version=python_version, py_filename=py_filename
-            )
-        )
+        submit_script_str = executor_1._format_submit_script(python_version, py_filename)
+        print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
+    assert "srun" not in submit_script_str
 
 
 @pytest.mark.asyncio
