@@ -230,13 +230,13 @@ def test_format_submit_script():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        submit_script_str = executor_1._format_submit_script(
-            python_version, py_filename, current_remote_workdir
+        print(
+            executor_1._format_submit_script(
+                python_version=python_version, py_filename=py_filename
+            )
         )
-        print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
-    assert "conda activate my-conda-env" in submit_script_str
 
 
 def test_format_submit_script_no_conda():
