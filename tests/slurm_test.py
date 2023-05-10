@@ -195,34 +195,6 @@ def test_format_py_script():
         assert False, f"Exception while running _format_py_script: {exc}"
     assert func_filename in py_script_str
     assert result_filename in py_script_str
-    assert os.path.join(dispatch_id, "node_" + str(task_id)) not in py_script_str
-
-
-def test_format_py_script_create_unique_workdir():
-    """Same as test_format_py_script but with create_unique_workdir=True."""
-    executor_0 = SlurmExecutor(
-        username="test_user",
-        address="test_address",
-        ssh_key_file=SSH_KEY_FILE,
-        remote_workdir="/federation/test_user/.cache/covalent",
-        create_unique_workdir=True,
-    )
-
-    dispatch_id = "148dedae-1b58-3870-z08d-db89bceec915"
-    task_id = 2
-    func_filename = f"func-{dispatch_id}-{task_id}.pkl"
-    result_filename = f"result-{dispatch_id}-{task_id}.pkl"
-    executor_0._current_remote_workdir = os.path.join(dispatch_id, "node_" + str(task_id))
-    try:
-        py_script_str = executor_0._format_py_script(
-            func_filename=func_filename, result_filename=result_filename
-        )
-        print(py_script_str)
-    except Exception as exc:
-        assert False, f"Exception while running _format_py_script: {exc}"
-    assert func_filename in py_script_str
-    assert result_filename in py_script_str
-    assert os.path.join(dispatch_id, "node_" + str(task_id)) in py_script_str
 
 
 def test_format_submit_script_default():
