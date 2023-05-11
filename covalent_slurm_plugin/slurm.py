@@ -114,7 +114,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.address = address or get_config("executors.slurm.address")
 
         self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
-        self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
+        self.ssh_key_file = (
+            str(Path(ssh_key_file).expanduser().resolve()) if ssh_key_file else self.ssh_key_file
+        )
 
         try:
             self.cert_file = cert_file or get_config("executors.slurm.cert_file")
