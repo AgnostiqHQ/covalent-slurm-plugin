@@ -322,6 +322,18 @@ async def test_failed_submit_script(mocker, conn_mock):
         )
         await executor._client_connect()
 
+    with pytest.raises(ValueError):
+        executor = SlurmExecutor(address="test_address", ssh_key_file=SSH_KEY_FILE)
+        await executor._client_connect()
+
+    with pytest.raises(ValueError):
+        executor = SlurmExecutor(username="test", ssh_key_file=SSH_KEY_FILE)
+        await executor._client_connect()
+
+    with pytest.raises(ValueError):
+        executor = SlurmExecutor(username="test", address="test_address")
+        await executor._client_connect()
+
 
 @pytest.mark.asyncio
 async def test_get_status(proc_mock, conn_mock):
@@ -673,4 +685,5 @@ async def test_teardown(mocker, proc_mock, conn_mock):
     with patch_ccs, patch_qrs, patch_pc:
         mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
         await executor.run(*dummy_args)
+        await executor.teardown(dummy_metadata)
         await executor.teardown(dummy_metadata)
