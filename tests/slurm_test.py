@@ -129,13 +129,14 @@ def test_init():
 def test_failed_init():
     """Test for failed inits"""
 
+    start_config = deepcopy(get_config())
     for key in ["cert_file", "slurm_path", "conda_env", "bashrc_path", "sshproxy", "srun_append"]:
         config = get_config()
         config["executors"]["slurm"].pop(key, None)
         set_config(config)
         executor = SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
-        assert executor.__dict__[key] is None
-        set_config(get_config())
+        assert not executor.__dict__[key]
+        set_config(start_config)
 
 
 def test_format_py_script():
