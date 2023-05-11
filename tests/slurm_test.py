@@ -128,7 +128,8 @@ def test_init():
 
 
 def test_failed_init():
-    default_config = asdict(DefaultConfig)
+    """Test for failed inits"""
+    default_config = asdict(DefaultConfig())
 
     username = "username"
     host = "host"
