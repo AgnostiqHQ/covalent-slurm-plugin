@@ -29,7 +29,7 @@ from unittest import mock
 import aiofiles
 import pytest
 from covalent._results_manager.result import Result
-from covalent._shared_files.config import get_config, set_config
+from covalent._shared_files.config import get_config, update_config
 from covalent._workflow.transport import TransportableObject
 from covalent.executor.base import wrapper_fn
 
@@ -150,35 +150,35 @@ def test_failed_init():
     config = {"executors": {"slurm": defaults}}
     config_copy = deepcopy(config)
 
-    set_config(config)
+    update_config(config)
     del config["executors"]["slurm"]["cert_file"]
     with pytest.raises(KeyError):
         SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
-    set_config(config_copy)
+    update_config(config_copy)
 
     del config["executors"]["slurm"]["slurm_path"]
     with pytest.raises(KeyError):
         SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
-    set_config(config_copy)
+    update_config(config_copy)
 
     del config["executors"]["slurm"]["conda_env"]
     with pytest.raises(KeyError):
         SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
-    set_config(config_copy)
+    update_config(config_copy)
 
     del config["executors"]["slurm"]["bashrc_path"]
     with pytest.raises(KeyError):
         SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
-    set_config(config_copy)
+    update_config(config_copy)
 
     with pytest.raises(KeyError):
         SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
-    set_config(config_copy)
+    update_config(config_copy)
 
     del config["executors"]["slurm"]["srun_append"]
     with pytest.raises(KeyError):
         SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
-    set_config(config_copy)
+    update_config(config_copy)
 
 
 def test_format_py_script():
