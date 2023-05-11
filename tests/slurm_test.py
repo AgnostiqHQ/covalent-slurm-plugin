@@ -21,6 +21,7 @@
 """Tests for the SLURM executor plugin."""
 
 import os
+from dataclasses import asdict
 from functools import partial
 from pathlib import Path
 from unittest import mock
@@ -28,7 +29,8 @@ from unittest import mock
 import aiofiles
 import pytest
 from covalent._results_manager.result import Result
-from covalent._shared_files.config import get_config
+from covalent._shared_files.config import get_config, update_config
+from covalent._shared_files.defaults import DefaultConfig
 from covalent._workflow.transport import TransportableObject
 from covalent.executor.base import wrapper_fn
 
@@ -123,6 +125,44 @@ def test_init():
     assert executor.poll_freq == poll_freq
     assert executor.cache_dir == cache_dir
     assert executor.options == {"parsable": ""}
+
+
+def test_failed_init():
+    default_config = asdict(DefaultConfig)
+
+    username = "username"
+    host = "host"
+    key_file = SSH_KEY_FILE
+
+    del default_config["executors"]["slurm"]["cert_file"]
+    with pytest.raises(KeyError):
+        SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+    update_config(default_config)
+
+    del default_config["executors"]["slurm"]["slurm_path"]
+    with pytest.raises(KeyError):
+        SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+    update_config(default_config)
+
+    del default_config["executors"]["slurm"]["conda_env"]
+    with pytest.raises(KeyError):
+        SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+    update_config(default_config)
+
+    del default_config["executors"]["slurm"]["bashrc_path"]
+    with pytest.raises(KeyError):
+        SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+    update_config(default_config)
+
+    del default_config["executors"]["slurm"]["sshproxy"]
+    with pytest.raises(KeyError):
+        SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+    update_config(default_config)
+
+    del default_config["executors"]["slurm"]["srun_append"]
+    with pytest.raises(KeyError):
+        SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+    update_config(default_config)
 
 
 def test_format_py_script():
@@ -659,4 +699,5 @@ async def test_teardown(mocker, proc_mock, conn_mock):
     with patch_ccs, patch_qrs, patch_pc:
         mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
         await executor.run(*dummy_args)
+        await executor.teardown(dummy_metadata)
         await executor.teardown(dummy_metadata)
