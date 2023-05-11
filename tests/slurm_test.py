@@ -701,4 +701,3 @@ async def test_teardown(mocker, proc_mock, conn_mock):
         mocker.patch("asyncssh.scp", return_value=mock.AsyncMock())
         await executor.run(*dummy_args)
         await executor.teardown(dummy_metadata)
-        await executor.teardown(dummy_metadata)
