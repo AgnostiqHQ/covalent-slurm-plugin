@@ -29,7 +29,7 @@ from unittest import mock
 import aiofiles
 import pytest
 from covalent._results_manager.result import Result
-from covalent._shared_files.config import get_config, set_config, update_config
+from covalent._shared_files.config import get_config, set_config
 from covalent._workflow.transport import TransportableObject
 from covalent.executor.base import wrapper_fn
 
@@ -134,7 +134,7 @@ def test_failed_init():
         config["executors"]["slurm"].pop(key, None)
         set_config(config)
         executor = SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
-        assert executor is None
+        assert executor.__dict__[key] is None
         set_config(get_config())
 
 
