@@ -335,7 +335,7 @@ def test_format_submit_script_no_srun():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        submit_script_str = executor_1._format_submit_script(python_version, py_filename)
+        submit_script_str = executor_1._format_submit_script(python_version, py_filename, remote_workdir)
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
@@ -348,13 +348,14 @@ def test_format_submit_script_no_conda():
     """Test that the shell script (in string form) which is to be submitted on
     the remote server is created with no errors with no Conda."""
 
+    remote_workdir = "/federation/test_user/.cache/covalent"
     executor_2 = SlurmExecutor(
         username="test_user",
         address="test_address",
         ssh_key_file="~/.ssh/id_rsa",
         conda_env="",
         bashrc_path="",
-        remote_workdir="/federation/test_user/.cache/covalent",
+        remote_workdir=remote_workdir,
         poll_freq=60,
         cache_dir="~/.cache/covalent",
     )
@@ -372,7 +373,7 @@ def test_format_submit_script_no_conda():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        submit_script_str = executor_2._format_submit_script(python_version, py_filename)
+        submit_script_str = executor_2._format_submit_script(python_version, py_filename, remote_workdir)
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script with default options: {exc}"
