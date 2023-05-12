@@ -305,6 +305,7 @@ def test_format_submit_script():
     for postrun_command in executor_1.postrun_commands:
         assert postrun_command in submit_script_str
     assert "--chdir=" + current_remote_workdir in submit_script_str
+    assert "source $HOME/.newbashrc" in submit_script_str
 
 
 def test_format_submit_script_no_srun():
