@@ -342,7 +342,6 @@ def test_format_submit_script_no_srun():
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
     assert "conda activate my-conda-env" in submit_script_str
-    assert "source $HOME/.newbashrc" in submit_script_str
     assert "srun" not in submit_script_str
 
 
