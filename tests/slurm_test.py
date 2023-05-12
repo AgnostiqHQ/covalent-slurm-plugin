@@ -234,6 +234,7 @@ def test_format_submit_script_default():
     assert submit_script_str.startswith(
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
+    assert "srun" in submit_script_str
     assert "--chdir=" + remote_workdir in submit_script_str
 
 
@@ -287,6 +288,43 @@ def test_format_submit_script():
     for postrun_command in executor_1.postrun_commands:
         assert postrun_command in submit_script_str
     assert "--chdir=" + current_remote_workdir in submit_script_str
+
+
+def test_format_submit_script_no_srun():
+    """Test that the shell script (in string form) which is to be submitted on
+    the remote server is created with no errors with no srun."""
+
+    remote_workdir = "/scratch/user/experiment1"
+    executor_1 = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        remote_workdir=remote_workdir,
+        conda_env="my-conda-env",
+        options={"nodes": 1, "c": 8, "qos": "regular"},
+        use_srun=False,
+    )
+
+    def simple_task(x):
+        return x
+
+    transport_function = partial(
+        wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5)
+    )
+    python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
+
+    dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
+    task_id = 3
+    py_filename = f"script-{dispatch_id}-{task_id}.py"
+
+    try:
+        submit_script_str = executor_1._format_submit_script(
+            python_version, py_filename, remote_workdir
+        )
+        print(submit_script_str)
+    except Exception as exc:
+        assert False, f"Exception while running _format_submit_script: {exc}"
+    assert "srun" not in submit_script_str
 
 
 @pytest.mark.asyncio
