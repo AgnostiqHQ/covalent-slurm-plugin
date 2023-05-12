@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A new kwarg, `use_srun`, that allows for the user to specify whether to use `srun` when running the pickled Python function.
 - Added docstring for `sshproxy`
 
+## [0.14.0] - 2023-05-12
+
+### Added
+
+- A new kwarg `create_unique_workdir` that will create unique subfolders of the type `<DISPATCH ID>/node_<NODE ID>` within `remote_workdir` if set to `True`
+
+### Fixed
+
+- Fixed a bug where `cleanup = False` would be ignored.
+- Fixed a bug where if `cache_dir` was not present, Covalent would crash.
+
+## [0.13.0] - 2023-05-11
+
+### Changed
+
+- Updated pre-commit hooks
+
 ## [0.12.1] - 2023-05-05
 
 ### Fixed
@@ -31,9 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.0] - 2023-05-02
 
 ### Added
+
 - Added instructions to the `README` for the remote machine's dependencies.
 
 ### Changed
+
 - Automatically apply the `"parsable": ""` option by default if not set by the user.
 
 ## [0.10.0] - 2023-05-01
