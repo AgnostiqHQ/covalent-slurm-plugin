@@ -49,7 +49,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "cert_file": None,
     "remote_workdir": "covalent-workdir",
     "create_unique_workdir": False,
-    "conda_env": "base",
+    "conda_env": "",
     "options": {
         "parsable": "",
     },
@@ -122,13 +122,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.address = address or get_config("executors.slurm.address")
 
         self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
-        self.ssh_key_file = (
-            str(Path(ssh_key_file).expanduser().resolve()) if ssh_key_file else self.ssh_key_file
-        )
 
         try:
             self.cert_file = cert_file or get_config("executors.slurm.cert_file")
-            self.cert_file = str(Path(self.cert_file).expanduser().resolve())
         except KeyError:
             self.cert_file = None
 
@@ -159,8 +155,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         except KeyError:
             self.bashrc_path = None
 
-        cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
-        self.cache_dir = str(Path(cache_dir).expanduser().resolve())
+        self.cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
 

@@ -84,7 +84,7 @@ def test_init():
     assert executor.remote_workdir == "covalent-workdir"
     assert executor.create_unique_workdir is False
     assert executor.slurm_path is None
-    assert executor.conda_env == "base"
+    assert executor.conda_env == ""
     assert executor.poll_freq == 60
     assert executor.options == {"parsable": ""}
     assert executor.srun_options == {}
