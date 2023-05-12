@@ -21,6 +21,7 @@
 """Tests for the SLURM executor plugin."""
 
 import os
+from copy import deepcopy
 from functools import partial
 from pathlib import Path
 from unittest import mock
@@ -28,7 +29,7 @@ from unittest import mock
 import aiofiles
 import pytest
 from covalent._results_manager.result import Result
-from covalent._shared_files.config import get_config
+from covalent._shared_files.config import get_config, set_config
 from covalent._workflow.transport import TransportableObject
 from covalent.executor.base import wrapper_fn
 
@@ -83,7 +84,8 @@ def test_init():
     assert executor.remote_workdir == "covalent-workdir"
     assert executor.create_unique_workdir is False
     assert executor.slurm_path is None
-    assert executor.conda_env is None
+    assert executor.conda_env == ""
+    assert executor.poll_freq == 60
     assert executor.options == {"parsable": ""}
     assert executor.srun_options == {}
     assert executor.srun_append is None
@@ -92,7 +94,6 @@ def test_init():
     assert executor.cache_dir == str(
         Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
     )
-    assert executor.poll_freq == 60
     assert executor.cleanup is True
 
     # Test with non-defaults
@@ -151,7 +152,7 @@ def test_init():
     assert executor.srun_append == srun_append
     assert executor.prerun_commands == prerun_commands
     assert executor.postrun_commands == postrun_commands
-    assert executor.cache_dir == str(Path(cache_dir).expanduser().resolve())
+    assert executor.cache_dir == cache_dir
     assert executor.poll_freq == poll_freq
     assert executor.cleanup == cleanup
 
@@ -164,6 +165,19 @@ def test_init():
     )
 
     assert executor.poll_freq == 60
+
+
+def test_failed_init():
+    """Test for failed inits"""
+
+    start_config = deepcopy(get_config())
+    for key in ["cert_file", "slurm_path", "conda_env", "bashrc_path", "sshproxy", "srun_append"]:
+        config = get_config()
+        config["executors"]["slurm"].pop(key, None)
+        set_config(config)
+        executor = SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
+        assert not executor.__dict__[key]
+        set_config(start_config)
 
 
 def test_format_py_script():
@@ -234,6 +248,8 @@ def test_format_submit_script_default():
     assert submit_script_str.startswith(
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
+    assert "conda" not in submit_script_str
+    assert "source $HOME/.bashrc" in submit_script_str
     assert "srun" in submit_script_str
     assert "--chdir=" + remote_workdir in submit_script_str
 
@@ -250,6 +266,7 @@ def test_format_submit_script():
         remote_workdir=remote_workdir,
         create_unique_workdir=True,
         conda_env="my-conda-env",
+        bashrc_path="$HOME/.newbashrc",
         options={"nodes": 1, "c": 8, "qos": "regular"},
         srun_options={"slurmd-debug": 4, "n": 12, "cpu_bind": "cores"},
         srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
@@ -288,6 +305,7 @@ def test_format_submit_script():
     for postrun_command in executor_1.postrun_commands:
         assert postrun_command in submit_script_str
     assert "--chdir=" + current_remote_workdir in submit_script_str
+    assert "source $HOME/.newbashrc" in submit_script_str
 
 
 def test_format_submit_script_no_srun():
@@ -324,7 +342,48 @@ def test_format_submit_script_no_srun():
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
+    assert "conda activate my-conda-env" in submit_script_str
     assert "srun" not in submit_script_str
+
+
+def test_format_submit_script_no_conda():
+    """Test that the shell script (in string form) which is to be submitted on
+    the remote server is created with no errors with no Conda."""
+
+    remote_workdir = "/federation/test_user/.cache/covalent"
+    executor_2 = SlurmExecutor(
+        username="test_user",
+        address="test_address",
+        ssh_key_file="~/.ssh/id_rsa",
+        conda_env="",
+        bashrc_path="",
+        remote_workdir=remote_workdir,
+        poll_freq=60,
+        cache_dir="~/.cache/covalent",
+    )
+
+    def simple_task(x):
+        return x
+
+    transport_function = partial(
+        wrapper_fn, TransportableObject(simple_task), [], [], TransportableObject(5)
+    )
+    python_version = ".".join(transport_function.args[0].python_version.split(".")[:2])
+
+    dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
+    task_id = 3
+    py_filename = f"script-{dispatch_id}-{task_id}.py"
+
+    try:
+        submit_script_str = executor_2._format_submit_script(
+            python_version, py_filename, remote_workdir
+        )
+        print(submit_script_str)
+    except Exception as exc:
+        assert False, f"Exception while running _format_submit_script with default options: {exc}"
+
+    assert "conda" not in submit_script_str
+    assert "source" not in submit_script_str
 
 
 @pytest.mark.asyncio
@@ -356,6 +415,18 @@ async def test_failed_submit_script(mocker, conn_mock):
             cache_dir="~/.cache/covalent",
             poll_freq=60,
         )
+        await executor._client_connect()
+
+    with pytest.raises(ValueError):
+        executor = SlurmExecutor(address="test_address", ssh_key_file=SSH_KEY_FILE)
+        await executor._client_connect()
+
+    with pytest.raises(ValueError):
+        executor = SlurmExecutor(username="test", ssh_key_file=SSH_KEY_FILE)
+        await executor._client_connect()
+
+    with pytest.raises(ValueError):
+        executor = SlurmExecutor(username="test", address="test_address")
         await executor._client_connect()
 
 

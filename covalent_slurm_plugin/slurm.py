@@ -45,19 +45,21 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "username": "",
     "address": "",
     "ssh_key_file": "",
+    "sshproxy": {},
     "cert_file": None,
     "remote_workdir": "covalent-workdir",
     "create_unique_workdir": False,
-    "slurm_path": None,
-    "conda_env": None,
+    "conda_env": "",
     "options": {
         "parsable": "",
     },
+    "prerun_commands": None,
+    "postrun_commands": None,
     "use_srun": True,
     "srun_options": {},
     "srun_append": None,
-    "prerun_commands": None,
-    "postrun_commands": None,
+    "bashrc_path": "$HOME/.bashrc",
+    "slurm_path": None,
     "cache_dir": str(Path(get_config("dispatcher.cache_dir")).expanduser().resolve()),
     "poll_freq": 60,
     "cleanup": True,
@@ -72,21 +74,22 @@ class SlurmExecutor(AsyncBaseExecutor):
     Args:
         username: Username used to authenticate over SSH.
         address: Remote address or hostname of the Slurm login node.
-        ssh_key_file: Private RSA key used to authenticate over SSH.
-        cert_file: Certificate file used to authenticate over SSH, if required.
+        ssh_key_file: Private RSA key used to authenticate over SSH (usually at ~/.ssh/id_rsa).
+        cert_file: Certificate file used to authenticate over SSH, if required (usually has extension .pub).
         sshproxy: Dictionary of parameters for sshproxy, namely the "hosts": List[str], "username": str, and "secret": str.
         remote_workdir: Working directory on the remote cluster.
         create_unique_workdir: Whether to create a unique working (sub)directory for each task.
-        slurm_path: Path to the slurm commands if they are not found automatically.
-        conda_env: Name of conda environment on which to run the function.
-        cache_dir: Local cache directory used by this executor for temporary files.
+        conda_env: Name of conda environment on which to run the function. Use "base" for the base environment or "" for no conda.
         options: Dictionary of parameters used to build a Slurm submit script.
         prerun_commands: List of shell commands to run before running the pickled function.
         postrun_commands: List of shell commands to run after running the pickled function.
         use_srun: Whether or not to run the pickled Python function with srun. If your function itself makes srun or mpirun calls, set this to False.
         srun_options: Dictionary of parameters passed to srun inside submit script.
         srun_append: Command nested into srun call.
-        poll_freq: Frequency with which to poll a submitted job.
+        bashrc_path: Path to the bashrc file to source before running the function.
+        slurm_path: Path to the slurm commands if they are not found automatically.
+        cache_dir: Local cache directory used by this executor for temporary files.
+        poll_freq: Frequency with which to poll a submitted job. Always is >= 60.
         cleanup: Whether to perform cleanup or not on remote machine.
     """
 
@@ -99,15 +102,16 @@ class SlurmExecutor(AsyncBaseExecutor):
         sshproxy: Dict = None,
         remote_workdir: str = None,
         create_unique_workdir: bool = None,
-        slurm_path: str = None,
         conda_env: str = None,
-        cache_dir: str = None,
         options: Dict = None,
         prerun_commands: List[str] = None,
         postrun_commands: List[str] = None,
         use_srun: bool = None,
         srun_options: Dict = None,
         srun_append: str = None,
+        bashrc_path: str = None,
+        slurm_path: str = None,
+        cache_dir: str = None,
         poll_freq: int = None,
         cleanup: bool = None,
         **kwargs,
@@ -118,11 +122,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.address = address or get_config("executors.slurm.address")
 
         self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
-        self.ssh_key_file = str(Path(ssh_key_file).expanduser().resolve())
 
         try:
             self.cert_file = cert_file or get_config("executors.slurm.cert_file")
-            self.cert_file = str(Path(self.cert_file).expanduser().resolve())
         except KeyError:
             self.cert_file = None
 
@@ -140,12 +142,20 @@ class SlurmExecutor(AsyncBaseExecutor):
             self.slurm_path = None
 
         try:
-            self.conda_env = conda_env or get_config("executors.slurm.conda_env")
+            self.conda_env = (
+                get_config("executors.slurm.conda_env") if conda_env is None else conda_env
+            )
         except KeyError:
             self.conda_env = None
 
-        cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
-        self.cache_dir = str(Path(cache_dir).expanduser().resolve())
+        try:
+            self.bashrc_path = (
+                get_config("executors.slurm.bashrc_path") if bashrc_path is None else bashrc_path
+            )
+        except KeyError:
+            self.bashrc_path = None
+
+        self.cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
 
@@ -350,23 +360,28 @@ class SlurmExecutor(AsyncBaseExecutor):
             slurm_preamble += "\n"
         slurm_preamble += "\n"
 
-        if hasattr(self, "conda_env") and self.conda_env:
-            conda_env_str = self.conda_env
+        conda_env_clean = "" if self.conda_env == "base" else self.conda_env
+
+        # Source commands
+        if self.bashrc_path:
+            source_text = f"source {self.bashrc_path}\n"
         else:
-            conda_env_str = ""
+            source_text = ""
 
         # sets up conda environment
-        slurm_conda = f"""
-source $HOME/.bashrc
-conda activate {conda_env_str}
-retval=$?
-if [ $retval -ne 0 ] ; then
-  >&2 echo "Conda environment {conda_env_str} is not present on the compute node. "\
-  "Please create the environment and try again."
-  exit 99
-fi
+        if self.conda_env:
+            slurm_conda = f"""
+            conda activate {conda_env_clean}
+            retval=$?
+            if [ $retval -ne 0 ] ; then
+                >&2 echo "Conda environment {self.conda_env} is not present on the compute node. "\
+                "Please create the environment and try again."
+                exit 99
+            fi
+            """
+        else:
+            slurm_conda = ""
 
-"""
         # checks remote python version
         slurm_python_version = f"""
 remote_py_version=$(python -c "print('.'.join(map(str, __import__('sys').version_info[:2])))")
@@ -418,7 +433,9 @@ fi
         slurm_body = "\n".join([slurm_prerun_commands, python_cmd, slurm_postrun_commands, "wait"])
 
         # assemble script
-        return "".join([slurm_preamble, slurm_conda, slurm_python_version, slurm_body])
+        return "".join(
+            [slurm_preamble, source_text, slurm_conda, slurm_python_version, slurm_body]
+        )
 
     def _format_py_script(
         self,
