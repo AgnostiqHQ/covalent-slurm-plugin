@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Does not put conda-related lines in SLURM script if `conda_env` is set to `False` or `""`..
+- Does not put conda-related lines in SLURM script if `conda_env` is set to `False` or `""`.
 - Changed default config value of `conda_env` from `None` to `"base"`, but it has the same effect as before.
 - A proper `ValueError` will now be raised if `ssh_key_file` is not supplied.
 
