@@ -91,9 +91,7 @@ def test_init():
     assert executor.srun_append is None
     assert executor.prerun_commands == []
     assert executor.postrun_commands == []
-    assert executor.cache_dir == str(
-        Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
-    )
+    assert executor.cache_dir == cache_dir
     assert executor.cleanup is True
 
     # Test with non-defaults
@@ -152,7 +150,7 @@ def test_init():
     assert executor.srun_append == srun_append
     assert executor.prerun_commands == prerun_commands
     assert executor.postrun_commands == postrun_commands
-    assert executor.cache_dir == str(Path(cache_dir).expanduser().resolve())
+    assert executor.cache_dir == cache_dir
     assert executor.poll_freq == poll_freq
     assert executor.cleanup == cleanup
 
@@ -248,7 +246,7 @@ def test_format_submit_script_default():
     assert submit_script_str.startswith(
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
-    assert "conda activate" in submit_script_str
+    assert "conda" not in submit_script_str
     assert "source $HOME/.bashrc" in submit_script_str
     assert "srun" in submit_script_str
     assert "--chdir=" + remote_workdir in submit_script_str
