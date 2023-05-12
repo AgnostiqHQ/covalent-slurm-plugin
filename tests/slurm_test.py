@@ -318,7 +318,9 @@ def test_format_submit_script_no_srun():
     py_filename = f"script-{dispatch_id}-{task_id}.py"
 
     try:
-        submit_script_str = executor_1._format_submit_script(python_version, py_filename, remote_workdir)
+        submit_script_str = executor_1._format_submit_script(
+            python_version, py_filename, remote_workdir
+        )
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script: {exc}"
