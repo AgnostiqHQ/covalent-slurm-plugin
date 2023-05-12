@@ -91,7 +91,9 @@ def test_init():
     assert executor.srun_append is None
     assert executor.prerun_commands == []
     assert executor.postrun_commands == []
-    assert executor.cache_dir == cache_dir
+    assert executor.cache_dir == str(
+        Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
+    )
     assert executor.cleanup is True
 
     # Test with non-defaults
