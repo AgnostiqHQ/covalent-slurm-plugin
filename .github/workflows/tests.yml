@@ -61,7 +61,7 @@ jobs:
       - name: Check out head
         uses: actions/checkout@v3
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Set up Python
         if: matrix.os == 'macos-latest'
@@ -129,6 +129,9 @@ jobs:
           if [ "$MASTER_VERSION" = "$VERSION" ] ; then
             echo "$VERSION has been previously released."
           else
+            # https://github.com/actions/checkout/issues/766
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
             git config user.name "CovalentOpsBot"
             git config user.email "covalentopsbot@users.noreply.github.com"
             git remote set-url origin https://${{ secrets.COVALENT_OPS_BOT_TOKEN }}@github.com/AgnostiqHQ/covalent-slurm-plugin.git
