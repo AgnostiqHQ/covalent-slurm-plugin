@@ -374,7 +374,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             conda activate {conda_env_clean}
             retval=$?
             if [ $retval -ne 0 ] ; then
-                >&2 echo "Conda environment {conda_env_clean} is not present on the compute node. "\
+                >&2 echo "Conda environment {self.conda_env} is not present on the compute node. "\
                 "Please create the environment and try again."
                 exit 99
             fi
