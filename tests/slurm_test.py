@@ -341,7 +341,7 @@ def test_format_submit_script_no_srun():
         assert False, f"Exception while running _format_submit_script: {exc}"
     assert "conda activate my-conda-env" in submit_script_str
     assert "source $HOME/.newbashrc" in submit_script_str
-
+    assert "srun" not in submit_script_str
 
 def test_format_submit_script_no_conda():
     """Test that the shell script (in string form) which is to be submitted on
@@ -378,14 +378,6 @@ def test_format_submit_script_no_conda():
 
     assert "conda" not in submit_script_str
     assert "source" not in submit_script_str
-=======
-        submit_script_str = executor_1._format_submit_script(
-            python_version, py_filename, remote_workdir
-        )
-        print(submit_script_str)
-    except Exception as exc:
-        assert False, f"Exception while running _format_submit_script: {exc}"
-    assert "srun" not in submit_script_str
 
 
 @pytest.mark.asyncio
