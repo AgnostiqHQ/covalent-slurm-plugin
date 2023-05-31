@@ -91,6 +91,10 @@ class SlurmExecutor(AsyncBaseExecutor):
         cache_dir: Local cache directory used by this executor for temporary files.
         poll_freq: Frequency with which to poll a submitted job. Always is >= 60.
         cleanup: Whether to perform cleanup or not on remote machine.
+        log_stdout: The path to the file to be used for redirecting stdout.
+        log_stderr: The path to the file to be used for redirecting stderr.
+        time_limit: time limit for the task
+        retries: Number of times to retry execution upon failure
     """
 
     def __init__(
@@ -114,9 +118,13 @@ class SlurmExecutor(AsyncBaseExecutor):
         cache_dir: str = None,
         poll_freq: int = None,
         cleanup: bool = None,
-        **kwargs,
+        log_stdout: str = "",
+        log_stderr: str = "",
+        time_limit: int = -1,
+        retries: int = 0,
     ):
-        super().__init__(**kwargs)
+        super().__init__(log_stdout=log_stdout, log_stderr=log_stderr,
+                         time_limit=time_limit, retries=retries)
 
         self.username = username or get_config("executors.slurm.username")
         self.address = address or get_config("executors.slurm.address")
