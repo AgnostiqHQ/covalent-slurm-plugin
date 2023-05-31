@@ -123,8 +123,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         time_limit: int = -1,
         retries: int = 0,
     ):
-        super().__init__(log_stdout=log_stdout, log_stderr=log_stderr,
-                         time_limit=time_limit, retries=retries)
+        super().__init__(
+            log_stdout=log_stdout, log_stderr=log_stderr, time_limit=time_limit, retries=retries
+        )
 
         self.username = username or get_config("executors.slurm.username")
         self.address = address or get_config("executors.slurm.address")
