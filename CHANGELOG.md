@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## Changed
+
+- Updates __init__ signature kwargs replaced with parent for better documentation.
+
+
 ## [0.16.0] - 2023-05-12
 
 ### Added
