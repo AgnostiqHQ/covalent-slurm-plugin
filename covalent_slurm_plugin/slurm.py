@@ -114,10 +114,11 @@ class SlurmExecutor(AsyncBaseExecutor):
         cache_dir: str = None,
         poll_freq: int = None,
         cleanup: bool = None,
+        conn_check_freq: int = None,
+        ssh_reconnect_attempts: int = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-
         self.username = username or get_config("executors.slurm.username")
         self.address = address or get_config("executors.slurm.address")
 
@@ -189,6 +190,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         if self.poll_freq < 60:
             print("Polling frequency will be increased to the minimum for Slurm: 60 seconds.")
             self.poll_freq = 60
+
+        self.conn_check_freq = conn_check_freq or 120
+        self.ssh_reconnect_attempts = ssh_reconnect_attempts or 5
 
         self.cleanup = get_config("executors.slurm.cleanup") if cleanup is None else cleanup
 
@@ -472,7 +476,7 @@ with open("{result_filename}", "wb") as f:
 """
 
     async def get_status(
-        self, info_dict: dict, conn: asyncssh.SSHClientConnection
+        self, info_dict: dict, conn: asyncssh.SSHClientConnection, wait: bool=True
     ) -> Union[Result, str]:
         """Query the status of a job previously submitted to Slurm.
 
@@ -481,10 +485,13 @@ with open("{result_filename}", "wb") as f:
                 status of the execution. Required keys in the dictionary are:
                     A string mapping "job_id" to Slurm job ID.
             conn: SSH connection object.
+            wait: sleep before getting status?
 
         Returns:
             status: String describing the job status.
         """
+        if wait:
+            await asyncio.sleep(self.poll_freq)
 
         job_id = info_dict.get("job_id")
         if job_id is None:
@@ -507,6 +514,14 @@ with open("{result_filename}", "wb") as f:
 
         proc = await conn.run(cmd_scontrol)
         return proc.stdout.strip()
+    
+    async def get_conn_status(self, conn: asyncssh.SSHClientConnection, wait: bool=True
+    ) -> bool:
+        if wait:
+            await asyncio.sleep(self.conn_check_freq)
+        app_log.debug("Checking if ssh connection is still open...")
+        status = await conn.is_closed()
+        return status
 
     async def _poll_slurm(self, job_id: int, conn: asyncssh.SSHClientConnection) -> None:
         """Poll a Slurm job until completion.
@@ -520,16 +535,41 @@ with open("{result_filename}", "wb") as f:
         """
 
         # Poll status every `poll_freq` seconds
-        status = await self.get_status({"job_id": str(job_id)}, conn)
-
+        status = await self.get_status({"job_id": str(job_id)}, conn, wait=False)
+        app_log.debug("Got first status", status)
+        reconnect_attempt_counter = 0
         while (
             "PENDING" in status
             or "RUNNING" in status
             or "COMPLETING" in status
             or "CONFIGURING" in status
         ):
-            await asyncio.sleep(self.poll_freq)
-            status = await self.get_status({"job_id": str(job_id)}, conn)
+            coroutines = {
+                asyncio.create_task(self.get_status({"job_id": str(job_id)}, conn)): "get_status",
+                asyncio.create_task(self.get_conn_status(conn)): "get_conn_status"
+            }
+            while coroutines:
+                done, _ = await asyncio.wait(coroutines.keys(), return_when=asyncio.FIRST_COMPLETED)
+
+                for task in done:
+                    coroutine = coroutines.pop(task)
+                    if coroutine == "get_status":
+                        status = await task
+                        app_log.debug(f"{coroutine} completed with status:", status)
+                    
+                    elif coroutine == "get_conn_status":
+                        is_conn_closing = await task
+                        app_log.debug(f"{coroutine} completed with status:", is_conn_closing)
+                        if is_conn_closing:
+                            if reconnect_attempt_counter >= self.ssh_reconnect_attempts:
+                                raise RuntimeError(
+                                    "exceeded maximum ssh reconnect attemps:\n",
+                                    self.ssh_reconnect_attempts
+                                    )
+                            else:
+                                # attempt reconnect
+                                conn = await self._client_connect()
+                                reconnect_attempt_counter += 1
 
         if "COMPLETED" not in status:
             raise RuntimeError("Job failed with status:\n", status)
@@ -686,6 +726,7 @@ with open("{result_filename}", "wb") as f:
             raise RuntimeError(proc.stderr.strip())
 
         app_log.debug(f"Job submitted with stdout: {proc.stdout.strip()}")
+        print("submitted slurm job")
         slurm_job_id = int(re.findall("[0-9]+", proc.stdout.strip())[0])
 
         app_log.debug(f"Polling slurm with job_id: {slurm_job_id} ...")
