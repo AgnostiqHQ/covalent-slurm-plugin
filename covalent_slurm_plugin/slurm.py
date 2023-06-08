@@ -475,7 +475,7 @@ except Exception as e:
 with open("{result_filename}", "wb") as f:
     pickle.dump((result, exception), f)
 """
-    
+
     async def run_remote_command_with_reconnect(
             self, conn: asyncssh.SSHClientConnection, command: str, timeout: int
     ):
@@ -493,7 +493,7 @@ with open("{result_filename}", "wb") as f:
                         reconnecting = False
                         conn_status = "broken"
                         error = e
-                    else:    
+                    else:
                         self.ssh_connect_retries += 1
                         app_log.debug(
                             f"SSH connection error {e}, reconnecting, attempt {self.ssh_connect_retries}..."
@@ -512,7 +512,7 @@ with open("{result_filename}", "wb") as f:
             raise RuntimeError("SSH connection error and number of reconnect retries exceeded",
                                 self.maximum_ssh_connect_retries, error
                     )
-                    
+
         app_log.debug("Finished get_ssh_conn_status")
         return result, conn_status, conn
 
@@ -558,7 +558,7 @@ with open("{result_filename}", "wb") as f:
             await self.run_remote_command_with_reconnect(conn, cmd_scontrol, 20)
         status = proc.stdout.strip()
         return status, conn_status, conn
-    
+
     async def get_ssh_conn_status(
             self, conn: asyncssh.SSHClientConnection, wait: bool=True
     ) -> bool:
@@ -603,7 +603,7 @@ with open("{result_filename}", "wb") as f:
                     if coroutine == "get_status":
                         status, conn_status, conn = await task
                         app_log.debug(f"{coroutine} completed with status: {status}")
-                    
+
                     elif coroutine == "get_ssh_conn_status":
                         conn_status, conn = await task
                         app_log.debug(f"{coroutine} completed with status: {conn_status}")
