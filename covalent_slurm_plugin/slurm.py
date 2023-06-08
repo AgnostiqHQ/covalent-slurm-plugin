@@ -192,7 +192,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             self.poll_freq = 60
 
         self.ssh_connect_retries = 0
-        self.maximum_ssh_connect_retries = maximum_ssh_connect_retries or 5
+        self.maximum_ssh_connect_retries = maximum_ssh_connect_retries or 10
         self.conn_check_freq = conn_check_freq or 120
 
         self.cleanup = get_config("executors.slurm.cleanup") if cleanup is None else cleanup
@@ -514,7 +514,7 @@ with open("{result_filename}", "wb") as f:
                     )
                     
         app_log.debug("Finished get_ssh_conn_status")
-        return [result, conn_status, conn]
+        return result, conn_status, conn
 
     async def get_status(
         self, info_dict: dict, conn: asyncssh.SSHClientConnection, wait: bool=True
@@ -546,30 +546,16 @@ with open("{result_filename}", "wb") as f:
 
         else:
             app_log.debug("Verifying slurm installation for scontrol...")
-            # Need Try except here which will spawn a connection reconnector
-            task_res = \
+            proc_verify_scontrol, conn_status, conn = \
                 await self.run_remote_command_with_reconnect(conn, self.LOAD_SLURM_PREFIX + "which scontrol", 20)
-            app_log.debug(f"task res is {task_res}")
-            proc_verify_scontrol = task_res[0]
-            app_log.debug(f"proc_verify_scontrol is {task_res[0]}") 
-            app_log.debug(f"proc_verify_scontrol type is {type(task_res[0])}") 
-            conn_status = task_res[1] 
-            app_log.debug(f"Conn status is {task_res[1]}") 
-            conn = task_res[2]
-            app_log.debug(f"Connection is {task_res[2]}") 
-            # proc_verify_scontrol = await conn.run(self.LOAD_SLURM_PREFIX + "which scontrol")
 
             if proc_verify_scontrol.returncode != 0:
                 raise RuntimeError("Please provide `slurm_path` to run scontrol command")
 
             cmd_scontrol = self.LOAD_SLURM_PREFIX + cmd_scontrol
-        # and here
-        task_res = \
+
+        proc, conn_status, conn = \
             await self.run_remote_command_with_reconnect(conn, cmd_scontrol, 20)
-        proc = task_res[0]
-        conn_status = task_res[1] 
-        conn = task_res[2]
-        # proc = await conn.run(cmd_scontrol)
         status = proc.stdout.strip()
         return status, conn_status, conn
     
@@ -582,7 +568,7 @@ with open("{result_filename}", "wb") as f:
         _, conn_status, conn = \
                 await self.run_remote_command_with_reconnect(conn, "echo \"checking ssh connection\"", 20)
         app_log.debug("Finished get_ssh_conn_status")
-        return [conn_status, conn]
+        return conn_status, conn
 
     async def _poll_slurm(self, job_id: int, conn: asyncssh.SSHClientConnection) -> None:
         """Poll a Slurm job until completion.
@@ -596,10 +582,8 @@ with open("{result_filename}", "wb") as f:
         # """
 
         # Poll status every `poll_freq` seconds
-        task_res = await self.get_status({"job_id": str(job_id)}, conn, wait=False)
-        status = task_res[0]
-        conn_status = task_res[1]
-        conn = task_res[2]
+        status, conn_status, conn = \
+              await self.get_status({"job_id": str(job_id)}, conn, wait=False)
         app_log.debug(f"Got first status: {status}")
         while (
             "PENDING" in status
@@ -617,20 +601,16 @@ with open("{result_filename}", "wb") as f:
                 for task in done:
                     coroutine = coroutines.pop(task)
                     if coroutine == "get_status":
-                        task_res = await task
-                        status = task_res[0]
-                        conn_status = task_res[1]
-                        conn = task_res[2]
+                        status, conn_status, conn = await task
                         app_log.debug(f"{coroutine} completed with status: {status}")
                     
                     elif coroutine == "get_ssh_conn_status":
-                        task_res = await task
-                        conn_status = task_res[0]
-                        conn = task_res[1]
+                        conn_status, conn = await task
                         app_log.debug(f"{coroutine} completed with status: {conn_status}")
 
         if "COMPLETED" not in status:
             raise RuntimeError("Job failed with status:\n", status)
+        return conn # Need to return conn to pass forwward as initial conn may be stale
 
     async def _query_result(
         self, result_filename: str, task_results_dir: str, conn: asyncssh.SSHClientConnection
@@ -788,7 +768,7 @@ with open("{result_filename}", "wb") as f:
         slurm_job_id = int(re.findall("[0-9]+", proc.stdout.strip())[0])
 
         app_log.debug(f"Polling slurm with job_id: {slurm_job_id} ...")
-        await self._poll_slurm(slurm_job_id, conn)
+        conn = await self._poll_slurm(slurm_job_id, conn)
 
         app_log.debug(f"Querying result with job_id: {slurm_job_id} ...")
         result, stdout, stderr, exception = await self._query_result(
