@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Docs
+
+- Add missing `,` to README.
+
 ## [0.16.0] - 2023-05-12
 
 ### Added
