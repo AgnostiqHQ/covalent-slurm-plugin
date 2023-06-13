@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updates __init__ signature kwargs replaced with parent for better documentation.
 
+### Docs
+
+- Add missing `,` to README.
 
 ## [0.16.0] - 2023-05-12
 
