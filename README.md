@@ -61,29 +61,29 @@ The second and third stanzas describe default parameters for ``#SBATCH`` directi
 This example generates a script containing the following preamble:
 
 ```console
-   #!/bin/bash
-   #SBATCH --nodes=1
-   #SBATCH --ntasks=4
-   #SBATCH --cpus-per-task=8
-   #SBATCH --constraint=gpu
-   #SBATCH --gpus=4
-   #SBATCH --qos=regular
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks=4
+#SBATCH --cpus-per-task=8
+#SBATCH --constraint=gpu
+#SBATCH --gpus=4
+#SBATCH --qos=regular
 ```
 
 and subsequent workflow submission with:
 
 ```console
-   srun --cpu_bind=cores --gpus=4 --gpu-bind=single:1
+srun --cpu_bind=cores --gpus=4 --gpu-bind=single:1
 ```
 
 To use the configuration settings, an electron’s executor must be specified with a string argument, in this case:
 
 ```python
-   import covalent as ct
+import covalent as ct
 
-   @ct.electron(executor="slurm")
-   def my_task(x, y):
-       return x + y
+@ct.electron(executor="slurm")
+def my_task(x, y):
+    return x + y
 ```
 
 Alternatively, passing a ``SlurmExecutor`` instance enables custom behavior scoped to specific tasks. Here, the executor's ``prerun_commands`` and ``postrun_commands`` parameters can be used to list shell commands to be executed before and after submitting the workflow. These may include any additional ``srun`` commands apart from workflow submission. Commands can also be nested inside the submission call to ``srun`` by using the ``srun_append`` parameter.
@@ -91,47 +91,47 @@ Alternatively, passing a ``SlurmExecutor`` instance enables custom behavior scop
 More complex jobs can be crafted by using these optional parameters. For example, the instance below runs a job that accesses CPU and GPU resources on a single node, while profiling GPU usage via ``nsys`` and issuing complementary commands that pause/resume the central hardware counter.
 
 ```python
-   executor = ct.executor.SlurmExecutor(
-       remote_workdir="/scratch/user/experiment1",
-       options={
-           "qos": "regular",
-           "time": "01:30:00",
-           "nodes": 1,
-           "constraint": "gpu",
-       },
-       prerun_commands=[
-           "module load package/1.2.3",
-           "srun --ntasks-per-node 1 dcgmi profile --pause"
-       ],
-       srun_options={
-           "n": 4,
-           "c": 8,
-           "cpu-bind": "cores",
-           "G": 4,
-           "gpu-bind": "single:1"
-       },
-       srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
-       postrun_commands=[
-           "srun --ntasks-per-node 1 dcgmi profile --resume",
-       ]
-   )
+import covalent as ct
 
-   @ct.electron(executor=executor)
-   def my_custom_task(x, y):
-       return x + y
+executor = ct.executor.SlurmExecutor(
+    username="user",
+    address="login.cluster.org",
+    ssh_key_file="/home/user/.ssh/id_rsa",
+    remote_workdir="/scratch/user/experiment1",
+    options={
+        "qos": "regular",
+        "time": "01:30:00",
+        "nodes": 1,
+        "constraint": "gpu",
+    },
+    prerun_commands=[
+        "module load package/1.2.3",
+        "srun --ntasks-per-node 1 dcgmi profile --pause",
+    ],
+    srun_options={"n": 4, "c": 8, "cpu-bind": "cores", "G": 4, "gpu-bind": "single:1"},
+    srun_append="nsys profile --stats=true -t cuda --gpu-metrics-device=all",
+    postrun_commands=[
+        "srun --ntasks-per-node 1 dcgmi profile --resume",
+    ],
+)
+
+
+@ct.electron(executor=executor)
+def my_custom_task(x, y):
+    return x + y
 ```
 
 Here the corresponding submit script contains the following commands:
 
 ```console
-   module load package/1.2.3
-   srun --ntasks-per-node 1 dcgmi profile --pause
+module load package/1.2.3
+srun --ntasks-per-node 1 dcgmi profile --pause
 
-   srun -n 4 -c 8 --cpu-bind=cores -G 4 --gpu-bind=single:1 \
-   nsys profile --stats=true -t cuda --gpu-metrics-device=all \
-   python /scratch/user/experiment1/workflow_script.py
+srun -n 4 -c 8 --cpu-bind=cores -G 4 --gpu-bind=single:1 \
+nsys profile --stats=true -t cuda --gpu-metrics-device=all \
+python /scratch/user/experiment1/workflow_script.py
 
-   srun --ntasks-per-node 1 dcgmi profile --resume
+srun --ntasks-per-node 1 dcgmi profile --resume
 ```
 
 ### sshproxy
