@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Docs
 
 - Add missing `,` to README.
+- Added `username`, `address`, and `ssh_key_file` to README `ct.executor.SlurmExecutor` example.
 
 ## [0.16.0] - 2023-05-12
 
