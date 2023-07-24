@@ -74,12 +74,11 @@ def test_init():
     # Test with defaults
     username = "username"
     host = "host"
-    key_file = SSH_KEY_FILE
-    executor = SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+    executor = SlurmExecutor(username=username, address=host)
 
     assert executor.username == username
     assert executor.address == host
-    assert executor.ssh_key_file == SSH_KEY_FILE
+    assert executor.ssh_key_file == str(Path("~/.ssh/id_rsa").expanduser().resolve())
     assert executor.cert_file is None
     assert executor.remote_workdir == "covalent-workdir"
     assert executor.create_unique_workdir is False
@@ -152,7 +151,7 @@ def test_init():
     assert executor.srun_append == srun_append
     assert executor.prerun_commands == prerun_commands
     assert executor.postrun_commands == postrun_commands
-    assert executor.cache_dir == cache_dir
+    assert executor.cache_dir == str(Path(cache_dir).expanduser().resolve())
     assert executor.poll_freq == poll_freq
     assert executor.cleanup == cleanup
 
@@ -394,13 +393,7 @@ async def test_failed_submit_script(mocker, conn_mock):
 
     with pytest.raises(FileNotFoundError):
         executor = SlurmExecutor(
-            username="test_user",
-            address="test_address",
-            ssh_key_file="/this/file/does/not/exist",
-            remote_workdir="/federation/test_user/.cache/covalent",
-            options={},
-            cache_dir="~/.cache/covalent",
-            poll_freq=60,
+            username="test_user", address="test_address", ssh_key_file="/this/file/does/not/exist"
         )
         await executor._client_connect()
 
@@ -410,10 +403,6 @@ async def test_failed_submit_script(mocker, conn_mock):
             address="test_address",
             ssh_key_file=SSH_KEY_FILE,
             cert_file="/this/file/does/not/exist",
-            remote_workdir="/federation/test_user/.cache/covalent",
-            options={},
-            cache_dir="~/.cache/covalent",
-            poll_freq=60,
         )
         await executor._client_connect()
 
@@ -423,10 +412,6 @@ async def test_failed_submit_script(mocker, conn_mock):
 
     with pytest.raises(ValueError):
         executor = SlurmExecutor(username="test", ssh_key_file=SSH_KEY_FILE)
-        await executor._client_connect()
-
-    with pytest.raises(ValueError):
-        executor = SlurmExecutor(username="test", address="test_address")
         await executor._client_connect()
 
 
@@ -576,9 +561,7 @@ async def test_query_result(mocker, proc_mock, conn_mock):
 async def test_run(mocker, proc_mock, conn_mock):
     """Test calling run works as expected."""
     executor1 = SlurmExecutor(
-        username="test_user",
-        address="test_address",
-        ssh_key_file="~/.ssh/id_rsa",
+        username="test_user", address="test_address", ssh_key_file=SSH_KEY_FILE
     )
 
     executor2 = SlurmExecutor(

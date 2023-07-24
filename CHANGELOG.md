@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Changed
 
+- Made "~/.ssh/id_rsa" the default for the `ssh_key_file` kwarg.
+- Automatically expand "~/" in `ssh_key_file`, `cache_dir`, and `cert_file`.
 - Updates __init__ signature kwargs replaced with parent for better documentation.
 
 ### Docs

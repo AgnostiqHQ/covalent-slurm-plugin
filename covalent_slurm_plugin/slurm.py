@@ -44,7 +44,7 @@ log_stack_info = logger.log_stack_info
 _EXECUTOR_PLUGIN_DEFAULTS = {
     "username": "",
     "address": "",
-    "ssh_key_file": "",
+    "ssh_key_file": str(Path("~/.ssh/id_rsa").expanduser().resolve()),
     "sshproxy": {},
     "cert_file": None,
     "remote_workdir": "covalent-workdir",
@@ -130,10 +130,14 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.username = username or get_config("executors.slurm.username")
         self.address = address or get_config("executors.slurm.address")
 
-        self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
+        self.ssh_key_file = str(
+            Path(ssh_key_file or get_config("executors.slurm.ssh_key_file")).expanduser().resolve()
+        )
 
         try:
-            self.cert_file = cert_file or get_config("executors.slurm.cert_file")
+            self.cert_file = str(
+                Path(cert_file or get_config("executors.slurm.cert_file")).expanduser().resolve()
+            )
         except KeyError:
             self.cert_file = None
 
@@ -164,7 +168,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         except KeyError:
             self.bashrc_path = None
 
-        self.cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
+        self.cache_dir = str(
+            Path(cache_dir or get_config("executors.slurm.cache_dir")).expanduser().resolve()
+        )
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
 
@@ -223,9 +229,6 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         if not self.address:
             raise ValueError("address is a required parameter in the Slurm plugin.")
-
-        if not self.ssh_key_file:
-            raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
 
         if self.sshproxy and self.address in self.sshproxy["hosts"]:
             try:
