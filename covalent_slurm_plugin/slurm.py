@@ -44,7 +44,7 @@ log_stack_info = logger.log_stack_info
 _EXECUTOR_PLUGIN_DEFAULTS = {
     "username": "",
     "address": "",
-    "ssh_key_file": "",
+    "ssh_key_file": None,
     "sshproxy": {},
     "cert_file": None,
     "remote_workdir": "covalent-workdir",

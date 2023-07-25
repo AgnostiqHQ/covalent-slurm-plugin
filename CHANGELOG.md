@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Changed
 
-- Make `ssh_key_file` optional.
-- Updates __init__ signature kwargs replaced with parent for better documentation.
+- Make `ssh_key_file` optional and change executor default to `None`.
+- Updates **init** signature kwargs replaced with parent for better documentation.
 
 ### Docs
 

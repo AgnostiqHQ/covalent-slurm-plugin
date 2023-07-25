@@ -74,12 +74,11 @@ def test_init():
     # Test with defaults
     username = "username"
     host = "host"
-    key_file = SSH_KEY_FILE
-    executor = SlurmExecutor(username=username, address=host, ssh_key_file=key_file)
+    executor = SlurmExecutor(username=username, address=host)
 
     assert executor.username == username
     assert executor.address == host
-    assert executor.ssh_key_file == SSH_KEY_FILE
+    assert executor.ssh_key_file is None
     assert executor.cert_file is None
     assert executor.remote_workdir == "covalent-workdir"
     assert executor.create_unique_workdir is False
