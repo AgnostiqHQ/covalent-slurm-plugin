@@ -224,9 +224,6 @@ class SlurmExecutor(AsyncBaseExecutor):
         if not self.address:
             raise ValueError("address is a required parameter in the Slurm plugin.")
 
-        if not self.ssh_key_file:
-            raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
-
         if self.sshproxy and self.address in self.sshproxy["hosts"]:
             try:
                 import oathtool
@@ -280,18 +277,14 @@ class SlurmExecutor(AsyncBaseExecutor):
         if self.cert_file and not os.path.exists(self.cert_file):
             raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
 
-        if not os.path.exists(self.ssh_key_file):
+        if self.ssh_key_file and not os.path.exists(self.ssh_key_file):
             raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
 
+        client_keys = []
+        if self.ssh_key_file:
+            client_keys.append(asyncssh.read_private_key(self.ssh_key_file))
         if self.cert_file:
-            client_keys = [
-                (
-                    asyncssh.read_private_key(self.ssh_key_file),
-                    asyncssh.read_certificate(self.cert_file),
-                )
-            ]
-        else:
-            client_keys = [asyncssh.read_private_key(self.ssh_key_file)]
+            client_keys.append(asyncssh.read_certificate(self.cert_file))
 
         try:
             conn = await asyncssh.connect(

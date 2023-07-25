@@ -425,10 +425,6 @@ async def test_failed_submit_script(mocker, conn_mock):
         executor = SlurmExecutor(username="test", ssh_key_file=SSH_KEY_FILE)
         await executor._client_connect()
 
-    with pytest.raises(ValueError):
-        executor = SlurmExecutor(username="test", address="test_address")
-        await executor._client_connect()
-
 
 @pytest.mark.asyncio
 async def test_get_status(proc_mock, conn_mock):
