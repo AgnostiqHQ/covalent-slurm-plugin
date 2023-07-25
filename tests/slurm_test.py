@@ -78,7 +78,7 @@ def test_init():
 
     assert executor.username == username
     assert executor.address == host
-    assert executor.ssh_key_file is None
+    assert executor.ssh_key_file == ""
     assert executor.cert_file is None
     assert executor.remote_workdir == "covalent-workdir"
     assert executor.create_unique_workdir is False
