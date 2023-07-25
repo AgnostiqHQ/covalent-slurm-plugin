@@ -74,8 +74,8 @@ class SlurmExecutor(AsyncBaseExecutor):
     Args:
         username: Username used to authenticate over SSH.
         address: Remote address or hostname of the Slurm login node.
-        ssh_key_file: Private RSA key used to authenticate over SSH (usually at ~/.ssh/id_rsa).
-        cert_file: Certificate file used to authenticate over SSH, if required (usually has extension .pub).
+        ssh_key_file: Full path to the private RSA key used to authenticate over SSH (usually at /home/username/.ssh/id_rsa).
+        cert_file: Full path to the certificate file used to authenticate over SSH, if required (usually has extension .pub).
         sshproxy: Dictionary of parameters for sshproxy, namely the "hosts": List[str], "username": str, and "secret": str.
         remote_workdir: Working directory on the remote cluster.
         create_unique_workdir: Whether to create a unique working (sub)directory for each task.
