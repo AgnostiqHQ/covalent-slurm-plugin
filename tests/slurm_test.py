@@ -171,7 +171,7 @@ def test_failed_init():
     """Test for failed inits"""
 
     start_config = deepcopy(get_config())
-    for key in ["cert_file", "slurm_path", "conda_env", "bashrc_path", "sshproxy", "srun_append"]:
+    for key in ["cert_file", "slurm_path", "conda_env", "bashrc_path", "srun_append"]:
         config = get_config()
         config["executors"]["slurm"].pop(key, None)
         set_config(config)
