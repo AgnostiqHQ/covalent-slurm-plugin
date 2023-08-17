@@ -25,7 +25,6 @@ import os
 import re
 import sys
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Union
 
@@ -45,7 +44,6 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "username": "",
     "address": "",
     "ssh_key_file": "",
-    "sshproxy": {},
     "cert_file": None,
     "remote_workdir": "covalent-workdir",
     "create_unique_workdir": False,
@@ -76,7 +74,6 @@ class SlurmExecutor(AsyncBaseExecutor):
         address: Remote address or hostname of the Slurm login node.
         ssh_key_file: Path to the private RSA key used to authenticate over SSH (usually at ~/.ssh/id_rsa). Note that you should use the full, resolved path (i.e. do not use `~/` in the string).
         cert_file: Path to the certificate file used to authenticate over SSH, if required (usually has extension .pub). Note that you should use the full, resolved path (i.e. do not use `~/` in the string).
-        sshproxy: Dictionary of parameters for sshproxy, namely the "hosts": List[str], "username": str, and "secret": str.
         remote_workdir: Working directory on the remote cluster.
         create_unique_workdir: Whether to create a unique working (sub)directory for each task.
         conda_env: Name of conda environment on which to run the function. Use "base" for the base environment or "" for no conda.
@@ -103,7 +100,6 @@ class SlurmExecutor(AsyncBaseExecutor):
         address: str = None,
         ssh_key_file: str = None,
         cert_file: str = None,
-        sshproxy: Dict = None,
         remote_workdir: str = None,
         create_unique_workdir: bool = None,
         conda_env: str = None,
@@ -173,13 +169,6 @@ class SlurmExecutor(AsyncBaseExecutor):
             options = get_config("executors.slurm.options")
         self.options = deepcopy(options)
 
-        if sshproxy is None:
-            try:
-                sshproxy = get_config("executors.slurm.sshproxy")
-            except KeyError:
-                sshproxy = {}
-        self.sshproxy = deepcopy(sshproxy)
-
         self.use_srun = get_config("executors.slurm.use_srun") if use_srun is None else use_srun
 
         if srun_options is None:
@@ -226,56 +215,6 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         if not self.ssh_key_file:
             raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
-
-        if self.sshproxy and self.address in self.sshproxy["hosts"]:
-            try:
-                import oathtool
-            except ImportError:
-                raise RuntimeError(
-                    "To use 'sshproxy' options, reinstall the Slurm plugin as 'pip install covalent-slurm-plugin[sshproxy]'"
-                )
-
-            # Validate the certificate is not expired
-            valid_cert = False
-            if self.cert_file and Path(self.cert_file).exists():
-                proc = await asyncio.create_subprocess_shell(
-                    f"ssh-keygen -L -f {self.cert_file} | awk '/Valid/ " + "{print $5}'",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                stdout, stderr = await proc.communicate()
-
-                if proc.returncode != 0:
-                    raise RuntimeError(
-                        "Failed to identify the expiration of the SSH key. Is this key compatible with sshproxy?"
-                    )
-
-                expiration = datetime.strptime(stdout.decode().rstrip(), "%Y-%m-%dT%H:%M:%S")
-                if expiration > datetime.now():
-                    valid_cert = True
-
-                app_log.debug(f"Certificate expiration: {stdout.decode()}")
-
-            if not valid_cert:
-                app_log.debug("Requesting new key and certificate")
-                password = self.sshproxy["password"]
-                otp = oathtool.generate_otp(self.sshproxy["secret"])
-
-                proc = await asyncio.create_subprocess_shell(
-                    f"sshproxy -u {self.username} -o {self.ssh_key_file}",
-                    stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                stdout, stderr = await proc.communicate(input=f"{password}{otp}".encode())
-
-                if proc.returncode != 0:
-                    raise RuntimeError(f"sshproxy failed to retrieve a key: {stderr.decode()}")
-
-                if not self.cert_file:
-                    self.cert_file = Path(self.ssh_key_file).parents[0] / "nersc-cert.pub"
-
-                app_log.debug("sshproxy successful")
 
         if self.cert_file and not os.path.exists(self.cert_file):
             raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
