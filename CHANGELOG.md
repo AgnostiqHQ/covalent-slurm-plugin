@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the `sshproxy` interface.
 - Updates __init__ signature kwargs replaced with parent for better documentation.
+- Updated license to Apache
 
 ### Docs
 

@@ -8,7 +8,7 @@
 [![python](https://img.shields.io/pypi/pyversions/covalent-slurm-plugin)](https://github.com/AgnostiqHQ/covalent-slurm-plugin)
 [![tests](https://github.com/AgnostiqHQ/covalent-slurm-plugin/actions/workflows/tests.yml/badge.svg)](https://github.com/AgnostiqHQ/covalent-slurm-plugin/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/gh/AgnostiqHQ/covalent-slurm-plugin/branch/main/graph/badge.svg?token=QNTR18SR5H)](https://codecov.io/gh/AgnostiqHQ/covalent-slurm-plugin)
-[![agpl](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
+[![apache](https://img.shields.io/badge/License-Apache_License_2.0-blue)](https://www.apache.org/licenses/LICENSE-2.0)
 
 </div>
 
@@ -149,4 +149,4 @@ Please use the following citation in any publications:
 
 ## License
 
-Covalent is licensed under the GNU Affero GPL 3.0 License. Covalent may be distributed under other licenses upon request. See the [LICENSE](https://github.com/AgnostiqHQ/covalent-slurm-plugin/blob/main/LICENSE) file or contact the [support team](mailto:support@agnostiq.ai) for more details.
+Covalent is licensed under the Apache License 2.0. See the [LICENSE](https://github.com/AgnostiqHQ/covalent-slurm-plugin/blob/main/LICENSE) file or contact the [support team](mailto:support@agnostiq.ai) for more details.
