@@ -33,7 +33,7 @@ jobs:
           fi
       - name: Check for version change
         id: changed-version-file
-        uses: tj-actions/changed-files@v18.4
+        uses: tj-actions/changed-files@v41
         with:
           files: |
             VERSION
