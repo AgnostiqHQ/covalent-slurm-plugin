@@ -315,9 +315,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         slurm_env_vars = {
             "COVALENT_CONFIG_DIR": "/tmp",
         }
-        slurm_env_vars = "\n".join(
-            [f"export {key}={value}" for key, value in slurm_env_vars.items()]
-        ) + "\n\n"
+        slurm_env_vars = (
+            "\n".join([f"export {key}={value}" for key, value in slurm_env_vars.items()]) + "\n\n"
+        )
 
         # sets up conda environment
         if self.conda_env:
@@ -384,14 +384,16 @@ fi
         slurm_body = "\n".join([slurm_prerun_commands, python_cmd, slurm_postrun_commands, "wait"])
 
         # assemble script
-        return "".join([
-            slurm_preamble,
-            source_text,
-            slurm_env_vars,
-            slurm_conda,
-            slurm_python_version,
-            slurm_body
-        ])
+        return "".join(
+            [
+                slurm_preamble,
+                source_text,
+                slurm_env_vars,
+                slurm_conda,
+                slurm_python_version,
+                slurm_body,
+            ]
+        )
 
     def _format_py_script(
         self,
