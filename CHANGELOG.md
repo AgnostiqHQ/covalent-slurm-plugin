@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## Added
+
+- export `COVALENT_CONFIG_DIR=/tmp` inside sbatch script to enable filelock
+
 ## Changed
 
+- Aesthetics and string formatting
 - Removed the `sshproxy` interface.
 - Updates __init__ signature kwargs replaced with parent for better documentation.
 - Updated license to Apache

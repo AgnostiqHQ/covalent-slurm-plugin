@@ -312,17 +312,24 @@ class SlurmExecutor(AsyncBaseExecutor):
         else:
             source_text = ""
 
+        slurm_env_vars = {
+            "COVALENT_CONFIG_DIR": "/tmp",
+        }
+        slurm_env_vars = (
+            "\n".join([f"export {key}={value}" for key, value in slurm_env_vars.items()]) + "\n\n"
+        )
+
         # sets up conda environment
         if self.conda_env:
-            slurm_conda = f"""
-            conda activate {conda_env_clean}
-            retval=$?
-            if [ $retval -ne 0 ] ; then
-                >&2 echo "Conda environment {self.conda_env} is not present on the compute node. "\
-                "Please create the environment and try again."
-                exit 99
-            fi
-            """
+            slurm_conda = f"""\
+conda activate {conda_env_clean}
+retval=$?
+if [ $retval -ne 0 ] ; then
+    >&2 echo "Conda environment {self.conda_env} is not present on the compute node. "\
+    "Please create the environment and try again."
+    exit 99
+fi
+"""
         else:
             slurm_conda = ""
 
@@ -378,7 +385,14 @@ fi
 
         # assemble script
         return "".join(
-            [slurm_preamble, source_text, slurm_conda, slurm_python_version, slurm_body]
+            [
+                slurm_preamble,
+                source_text,
+                slurm_env_vars,
+                slurm_conda,
+                slurm_python_version,
+                slurm_body,
+            ]
         )
 
     def _format_py_script(
