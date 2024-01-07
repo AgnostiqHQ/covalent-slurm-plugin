@@ -43,6 +43,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "cert_file": None,
     "remote_workdir": "covalent-workdir",
     "create_unique_workdir": False,
+    "variables": {},
     "conda_env": "",
     "options": {
         "parsable": "",
@@ -72,6 +73,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         cert_file: Certificate file used to authenticate over SSH, if required (usually has extension .pub).
         remote_workdir: Working directory on the remote cluster.
         create_unique_workdir: Whether to create a unique working (sub)directory for each task.
+        variables: A dictionary of environment variables to declare before job execution.
         conda_env: Name of conda environment on which to run the function. Use "base" for the base environment or "" for no conda.
         options: Dictionary of parameters used to build a Slurm submit script.
         prerun_commands: List of shell commands to run before running the pickled function.
@@ -98,6 +100,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         cert_file: str = None,
         remote_workdir: str = None,
         create_unique_workdir: bool = None,
+        variables: Dict[str, str] = None,
         conda_env: str = None,
         options: Dict = None,
         prerun_commands: List[str] = None,
@@ -136,6 +139,8 @@ class SlurmExecutor(AsyncBaseExecutor):
             if create_unique_workdir is None
             else create_unique_workdir
         )
+
+        self.variables = variables or get_config("executors.slurm.variables")
 
         try:
             self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
@@ -277,7 +282,12 @@ class SlurmExecutor(AsyncBaseExecutor):
         await conn.run(f"rm {remote_stderr_filename}")
 
     def _format_submit_script(
-        self, python_version: str, py_filename: str, current_remote_workdir: str
+        self,
+        python_version: str,
+        py_filename: str,
+        func_filename: str,
+        result_filename: str,
+        current_remote_workdir: str
     ) -> str:
         """Create the SLURM that defines the job, uses srun to run the python script.
 
@@ -312,12 +322,10 @@ class SlurmExecutor(AsyncBaseExecutor):
         else:
             source_text = ""
 
-        slurm_env_vars = {
-            "COVALENT_CONFIG_DIR": "/tmp",
-        }
-        slurm_env_vars = (
-            "\n".join([f"export {key}={value}" for key, value in slurm_env_vars.items()]) + "\n\n"
-        )
+        # sets user-specified variables
+        environment_variable_exports = (
+            "\n".join([f'export {key}="{value}"' for key, value in self.variables.items()])
+        ) + "\n\n"
 
         # sets up conda environment
         if self.conda_env:
@@ -334,10 +342,18 @@ fi
             slurm_conda = ""
 
         # checks remote python version
+        from covalent import __version__ as covalent_version
+
         slurm_python_version = f"""
 remote_py_version=$(python -c "print('.'.join(map(str, __import__('sys').version_info[:2])))")
 if [[ "{python_version}" != $remote_py_version ]] ; then
   >&2 echo "Python version mismatch. Please install Python {python_version} in the compute environment."
+  exit 199
+fi
+
+covalent_version=$(python -c "import covalent; print(covalent.__version__, end='')")
+if [[ "{covalent_version}" != $covalent_version ]] ; then
+  >&2 echo "covalent version mismatch. Compute environment 'covalent=$covalent_version' versus user's 'covalent=={covalent_version}'."
   exit 199
 fi
 """
@@ -372,7 +388,7 @@ fi
             slurm_srun = ""
 
         remote_py_filename = os.path.join(self.remote_workdir, py_filename)
-        python_cmd = slurm_srun + f"python {remote_py_filename}"
+        python_cmd = f"{slurm_srun}python {remote_py_filename} {func_filename} {result_filename}"
 
         # runs post-run commands
         if self.postrun_commands:
@@ -388,46 +404,12 @@ fi
             [
                 slurm_preamble,
                 source_text,
-                slurm_env_vars,
+                environment_variable_exports,
                 slurm_conda,
                 slurm_python_version,
                 slurm_body,
             ]
         )
-
-    def _format_py_script(
-        self,
-        func_filename: str,
-        result_filename: str,
-    ) -> str:
-        """Create the Python script that executes the pickled python function.
-
-        Args:
-            func_filename: Name of the pickled function.
-            result_filename: Name of the pickled result.
-
-        Returns:
-            script: String object containing a script parsable by sbatch.
-        """
-        func_filename = os.path.join(self.remote_workdir, func_filename)
-        result_filename = os.path.join(self.remote_workdir, result_filename)
-        return f"""
-import cloudpickle as pickle
-
-with open("{func_filename}", "rb") as f:
-    function, args, kwargs = pickle.load(f)
-
-result = None
-exception = None
-
-try:
-    result = function(*args, **kwargs)
-except Exception as e:
-    exception = e
-
-with open("{result_filename}", "wb") as f:
-    pickle.dump((result, exception), f)
-"""
 
     async def get_status(
         self, info_dict: dict, conn: asyncssh.SSHClientConnection
@@ -490,7 +472,7 @@ with open("{result_filename}", "wb") as f:
             status = await self.get_status({"job_id": str(job_id)}, conn)
 
         if "COMPLETED" not in status:
-            raise RuntimeError("Job failed with status:\n", status)
+            raise RuntimeError(f"Job failed with status:\n{status}")
 
     async def _query_result(
         self, result_filename: str, task_results_dir: str, conn: asyncssh.SSHClientConnection
@@ -603,7 +585,7 @@ with open("{result_filename}", "wb") as f:
 
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
             # Format the function execution script, write to file, and copy to remote filesystem
-            python_exec_script = self._format_py_script(func_filename, result_filename)
+            python_exec_script = (Path(__file__).parent / "exec.py").read_text("utf-8")
             app_log.debug("Writing python run-function script to tempfile...")
             await temp_g.write(python_exec_script)
             await temp_g.flush()
@@ -615,7 +597,11 @@ with open("{result_filename}", "wb") as f:
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_h:
             # Format the SLURM submit script, write to file, and copy to remote filesystem
             slurm_submit_script = self._format_submit_script(
-                py_version_func, py_script_filename, current_remote_workdir
+                py_version_func,
+                py_script_filename,
+                func_filename,
+                result_filename,
+                current_remote_workdir
             )
             app_log.debug("Writing slurm submit script to tempfile...")
             await temp_h.write(slurm_submit_script)
