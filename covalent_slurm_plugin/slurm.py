@@ -17,7 +17,6 @@
 """Slurm executor plugin for the Covalent dispatcher."""
 
 import asyncio
-import os
 import re
 import sys
 from copy import deepcopy
@@ -127,14 +126,15 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.username = username or get_config("executors.slurm.username")
         self.address = address or get_config("executors.slurm.address")
 
-        self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
+        self.ssh_key_file = Path(ssh_key_file or get_config("executors.slurm.ssh_key_file"))
 
         try:
-            self.cert_file = cert_file or get_config("executors.slurm.cert_file")
+            cert_file = cert_file or get_config("executors.slurm.cert_file")
+            self.cert_file = Path(cert_file) if cert_file else None
         except KeyError:
             self.cert_file = None
 
-        self.remote_workdir = remote_workdir or get_config("executors.slurm.remote_workdir")
+        self.remote_workdir = Path(remote_workdir or get_config("executors.slurm.remote_workdir"))
 
         self.create_unique_workdir = (
             get_config("executors.slurm.create_unique_workdir")
@@ -163,9 +163,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         except KeyError:
             self.bashrc_path = None
 
-        self.cache_dir = cache_dir or get_config("executors.slurm.cache_dir")
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
+        self.cache_dir = Path(cache_dir or get_config("executors.slurm.cache_dir"))
+        if not self.cache_dir.exists():
+            self.cache_dir.mkdir()
 
         # To allow passing empty dictionary
         if options is None:
@@ -219,11 +219,11 @@ class SlurmExecutor(AsyncBaseExecutor):
         if not self.ssh_key_file:
             raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
 
-        if self.cert_file and not os.path.exists(self.cert_file):
-            raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
+        if self.cert_file and not self.cert_file.exists():
+            raise FileNotFoundError(f"Certificate file not found: {self.cert_file!s}")
 
-        if not os.path.exists(self.ssh_key_file):
-            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
+        if not self.ssh_key_file.exists():
+            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file!s}")
 
         if self.cert_file:
             client_keys = [
@@ -318,7 +318,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         return job_script.format(
             python_version=python_version,
-            remote_py_filename=os.path.join(self.remote_workdir, py_filename),
+            remote_py_filename=str(self.remote_workdir / py_filename),
             func_filename=func_filename,
             result_filename=result_filename,
         )
@@ -398,21 +398,22 @@ class SlurmExecutor(AsyncBaseExecutor):
         Returns:
             result: Task result.
         """
+        task_results_dir = Path(task_results_dir)
 
         # Check the result file exists on the remote backend
-        remote_result_filename = os.path.join(self.remote_workdir, result_filename)
+        remote_result_filename = self.remote_workdir / result_filename
 
         proc = await conn.run(f"test -e {remote_result_filename}")
         if proc.returncode != 0:
             raise FileNotFoundError(proc.returncode, proc.stderr.strip(), remote_result_filename)
 
         # Copy result file from remote machine to Covalent server
-        local_result_filename = os.path.join(task_results_dir, result_filename)
+        local_result_filename = task_results_dir / result_filename
         await asyncssh.scp((conn, remote_result_filename), local_result_filename)
 
         # Copy stdout, stderr from remote machine to Covalent server
-        stdout_file = os.path.join(task_results_dir, os.path.basename(self.options["output"]))
-        stderr_file = os.path.join(task_results_dir, os.path.basename(self.options["error"]))
+        stdout_file = task_results_dir / Path(self.options["output"]).name
+        stderr_file = task_results_dir / Path(self.options["error"]).name
 
         await asyncssh.scp((conn, self.options["output"]), stdout_file)
         await asyncssh.scp((conn, self.options["error"]), stderr_file)
@@ -446,13 +447,11 @@ class SlurmExecutor(AsyncBaseExecutor):
         """
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
-        results_dir = task_metadata["results_dir"]
-        task_results_dir = os.path.join(results_dir, dispatch_id)
+        results_dir = Path(task_metadata["results_dir"])
+        task_results_dir = results_dir / dispatch_id
 
         if self.create_unique_workdir:
-            current_remote_workdir = os.path.join(
-                self.remote_workdir, dispatch_id, "node_" + str(node_id)
-            )
+            current_remote_workdir = self.remote_workdir / dispatch_id / f"node_{node_id}"
         else:
             current_remote_workdir = self.remote_workdir
 
@@ -462,13 +461,10 @@ class SlurmExecutor(AsyncBaseExecutor):
         func_filename = f"func-{dispatch_id}-{node_id}.pkl"
 
         if "output" not in self.options:
-            self.options["output"] = os.path.join(
-                current_remote_workdir, f"stdout-{dispatch_id}-{node_id}.log"
-            )
+            self.options["output"] = current_remote_workdir / f"stdout-{dispatch_id}-{node_id}.log"
+
         if "error" not in self.options:
-            self.options["error"] = os.path.join(
-                current_remote_workdir, f"stderr-{dispatch_id}-{node_id}.log"
-            )
+            self.options["error"] = current_remote_workdir / f"stderr-{dispatch_id}-{node_id}.log"
 
         result = None
 
@@ -491,7 +487,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             await temp_f.write(pickle.dumps((function, args, kwargs)))
             await temp_f.flush()
 
-            remote_func_filename = os.path.join(self.remote_workdir, func_filename)
+            remote_func_filename = self.remote_workdir / func_filename
             app_log.debug("Copying pickled function to remote fs: %s ...", remote_func_filename)
             await asyncssh.scp(temp_f.name, (conn, remote_func_filename))
 
@@ -502,7 +498,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             await temp_g.write(python_exec_script)
             await temp_g.flush()
 
-            remote_py_script_filename = os.path.join(self.remote_workdir, py_script_filename)
+            remote_py_script_filename = self.remote_workdir / py_script_filename
             app_log.debug("Copying python run-function to remote fs: %s", remote_py_script_filename)
             await asyncssh.scp(temp_g.name, (conn, remote_py_script_filename))
 
@@ -519,7 +515,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             await temp_h.write(slurm_submit_script)
             await temp_h.flush()
 
-            remote_slurm_filename = os.path.join(current_remote_workdir, slurm_filename)
+            remote_slurm_filename = current_remote_workdir / slurm_filename
             app_log.debug("Copying slurm submit script to remote fs: %s", remote_slurm_filename)
             await asyncssh.scp(temp_h.name, (conn, remote_slurm_filename))
 
@@ -589,9 +585,7 @@ class SlurmExecutor(AsyncBaseExecutor):
                     remote_func_filename=self._remote_func_filename,
                     remote_slurm_filename=self._remote_slurm_filename,
                     remote_py_filename=self._remote_py_script_filename,
-                    remote_result_filename=os.path.join(
-                        self.remote_workdir, self._result_filename
-                    ),
+                    remote_result_filename=self.remote_workdir / self._result_filename,
                     remote_stdout_filename=self.options["output"],
                     remote_stderr_filename=self.options["error"],
                 )
