@@ -352,9 +352,17 @@ if [[ "{python_version}" != $remote_py_version ]] ; then
 fi
 
 covalent_version=$(python -c "import covalent; print(covalent.__version__, end='')")
-if [[ "{covalent_version}" != $covalent_version ]] ; then
-  >&2 echo "covalent version mismatch. Compute environment 'covalent=$covalent_version' versus user's 'covalent=={covalent_version}'."
-  exit 199
+if [[ $covalent_version != "{covalent_version}" ]] ; then
+  >&2 echo "Covalent version mismatch."
+  >&2 echo "Compute environment has 'covalent==$covalent_version', user has 'covalent=={covalent_version}'"
+  exit 299
+fi
+
+cloudpickle_version=$(python -c "import cloudpickle; print(cloudpickle.__version__)")
+if [[ $cloudpickle_version != "{pickle.__version__}" ]] ; then
+  >&2 echo "Cloudpickle version mismatch."
+  >&2 echo "Compute environment has 'cloudpickle==$cloudpickle_version', but user has 'cloudpickle=={pickle.__version__}'"
+  exit 399
 fi
 """
         # runs pre-run commands
