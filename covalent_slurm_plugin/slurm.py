@@ -33,6 +33,8 @@ from covalent._shared_files import logger
 from covalent._shared_files.config import get_config
 from covalent.executor.base import AsyncBaseExecutor
 
+from covalent_slurm_plugin.job_script import JobScript
+
 app_log = logger.app_log
 log_stack_info = logger.log_stack_info
 
@@ -300,123 +302,25 @@ class SlurmExecutor(AsyncBaseExecutor):
             script: String object containing a script parsable by sbatch.
         """
 
-        # Add chdir to current working directory
         self.options["chdir"] = current_remote_workdir
 
-        # preamble
-        slurm_preamble = "#!/bin/bash\n"
-        for key, value in self.options.items():
-            slurm_preamble += "#SBATCH "
-            if len(key) == 1:
-                slurm_preamble += f"-{key}" + (f" {value}" if value else "")
-            else:
-                slurm_preamble += f"--{key}" + (f"={value}" if value else "")
-            slurm_preamble += "\n"
-        slurm_preamble += "\n"
+        job_script = JobScript(
+            sbatch_options=self.options,
+            srun_options=self.srun_options,
+            variables=self.variables,
+            bashrc_path=self.bashrc_path,
+            conda_env=self.conda_env,
+            prerun_commands=self.prerun_commands,
+            srun_append=self.srun_append,
+            postrun_commands=self.postrun_commands,
+            use_srun=self.use_srun,
+        )
 
-        conda_env_clean = "" if self.conda_env == "base" else self.conda_env
-
-        # Source commands
-        if self.bashrc_path:
-            source_text = f"source {self.bashrc_path}\n"
-        else:
-            source_text = ""
-
-        # sets user-specified variables
-        environment_variable_exports = (
-            "\n".join([f'export {key}="{value}"' for key, value in self.variables.items()])
-        ) + "\n\n"
-
-        # sets up conda environment
-        if self.conda_env:
-            slurm_conda = f"""\
-conda activate {conda_env_clean}
-retval=$?
-if [ $retval -ne 0 ] ; then
-    >&2 echo "Conda environment {self.conda_env} is not present on the compute node. "\
-    "Please create the environment and try again."
-    exit 99
-fi
-"""
-        else:
-            slurm_conda = ""
-
-        # checks remote python version
-        from covalent import __version__ as covalent_version
-
-        slurm_python_version = f"""
-remote_py_version=$(python -c "print('.'.join(map(str, __import__('sys').version_info[:2])))")
-if [[ "{python_version}" != $remote_py_version ]] ; then
-  >&2 echo "Python version mismatch. Please install Python {python_version} in the compute environment."
-  exit 199
-fi
-
-covalent_version=$(python -c "import covalent; print(covalent.__version__, end='')")
-if [[ $covalent_version != "{covalent_version}" ]] ; then
-  >&2 echo "Covalent version mismatch."
-  >&2 echo "Compute environment has 'covalent==$covalent_version', user has 'covalent=={covalent_version}'"
-  exit 299
-fi
-
-cloudpickle_version=$(python -c "import cloudpickle; print(cloudpickle.__version__)")
-if [[ $cloudpickle_version != "{pickle.__version__}" ]] ; then
-  >&2 echo "Cloudpickle version mismatch."
-  >&2 echo "Compute environment has 'cloudpickle==$cloudpickle_version', but user has 'cloudpickle=={pickle.__version__}'"
-  exit 399
-fi
-"""
-        # runs pre-run commands
-        if self.prerun_commands:
-            slurm_prerun_commands = "\n".join([""] + self.prerun_commands + [""])
-        else:
-            slurm_prerun_commands = ""
-
-        if self.use_srun:
-            # uses srun to run script calling pickled function
-            srun_options_str = ""
-            for key, value in self.srun_options.items():
-                srun_options_str += " "
-                if len(key) == 1:
-                    srun_options_str += f"-{key}" + (f" {value}" if value else "")
-                else:
-                    srun_options_str += f"--{key}" + (f"={value}" if value else "")
-
-            slurm_srun = f"srun{srun_options_str} \\"
-
-            if self.srun_append:
-                # insert any appended commands
-                slurm_srun += f"""
-    {self.srun_append} \\
-    """
-            else:
-                slurm_srun += """
-    """
-
-        else:
-            slurm_srun = ""
-
-        remote_py_filename = os.path.join(self.remote_workdir, py_filename)
-        python_cmd = f"{slurm_srun}python {remote_py_filename} {func_filename} {result_filename}"
-
-        # runs post-run commands
-        if self.postrun_commands:
-            slurm_postrun_commands = "\n".join([""] + self.postrun_commands + [""])
-        else:
-            slurm_postrun_commands = ""
-
-        # assemble commands into slurm body
-        slurm_body = "\n".join([slurm_prerun_commands, python_cmd, slurm_postrun_commands, "wait"])
-
-        # assemble script
-        return "".join(
-            [
-                slurm_preamble,
-                source_text,
-                environment_variable_exports,
-                slurm_conda,
-                slurm_python_version,
-                slurm_body,
-            ]
+        return job_script.format(
+            python_version=python_version,
+            remote_py_filename=os.path.join(self.remote_workdir, py_filename),
+            func_filename=func_filename,
+            result_filename=result_filename,
         )
 
     async def get_status(
