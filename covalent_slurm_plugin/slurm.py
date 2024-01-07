@@ -475,10 +475,10 @@ class SlurmExecutor(AsyncBaseExecutor):
         conn = await self._client_connect()
 
         py_version_func = ".".join(function.args[0].python_version.split(".")[:2])
-        app_log.debug(f"Python version: {py_version_func}")
+        app_log.debug("Python version: %s", py_version_func)
 
         # Create the remote directory
-        app_log.debug(f"Creating remote work directory {current_remote_workdir} ...")
+        app_log.debug("Creating remote work directory %s ...", current_remote_workdir)
         cmd_mkdir_remote = f"mkdir -p {current_remote_workdir}"
         proc_mkdir_remote = await conn.run(cmd_mkdir_remote)
 
@@ -492,7 +492,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             await temp_f.flush()
 
             remote_func_filename = os.path.join(self.remote_workdir, func_filename)
-            app_log.debug(f"Copying pickled function to remote fs: {remote_func_filename} ...")
+            app_log.debug("Copying pickled function to remote fs: %s ...", remote_func_filename)
             await asyncssh.scp(temp_f.name, (conn, remote_func_filename))
 
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_g:
@@ -503,7 +503,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             await temp_g.flush()
 
             remote_py_script_filename = os.path.join(self.remote_workdir, py_script_filename)
-            app_log.debug(f"Copying python run-function to remote fs: {remote_py_script_filename}")
+            app_log.debug("Copying python run-function to remote fs: %s", remote_py_script_filename)
             await asyncssh.scp(temp_g.name, (conn, remote_py_script_filename))
 
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_h:
@@ -520,11 +520,11 @@ class SlurmExecutor(AsyncBaseExecutor):
             await temp_h.flush()
 
             remote_slurm_filename = os.path.join(current_remote_workdir, slurm_filename)
-            app_log.debug(f"Copying slurm submit script to remote fs: {remote_slurm_filename} ...")
+            app_log.debug("Copying slurm submit script to remote fs: %s", remote_slurm_filename)
             await asyncssh.scp(temp_h.name, (conn, remote_slurm_filename))
 
         # Execute the script
-        app_log.debug(f"Running the script: {remote_slurm_filename} ...")
+        app_log.debug("Running the script: %s", remote_slurm_filename)
         cmd_sbatch = f"sbatch {remote_slurm_filename}"
         if self.slurm_path:
             app_log.debug("Exporting slurm path for sbatch...")
@@ -541,13 +541,13 @@ class SlurmExecutor(AsyncBaseExecutor):
         if proc.returncode != 0:
             raise RuntimeError(proc.stderr.strip())
 
-        app_log.debug(f"Job submitted with stdout: {proc.stdout.strip()}")
+        app_log.debug("Job submitted with stdout: %s", proc.stdout.strip())
         slurm_job_id = int(re.findall("[0-9]+", proc.stdout.strip())[0])
 
-        app_log.debug(f"Polling slurm with job_id: {slurm_job_id} ...")
+        app_log.debug("Polling slurm with job_id: %s ...", slurm_job_id)
         await self._poll_slurm(slurm_job_id, conn)
 
-        app_log.debug(f"Querying result with job_id: {slurm_job_id} ...")
+        app_log.debug("Querying result with job_id: %s ...", slurm_job_id)
         result, stdout, stderr, exception = await self._query_result(
             result_filename, task_results_dir, conn
         )
