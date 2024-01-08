@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tools for formatting the Slurm job submission script."""
 
 import re
 from typing import Dict, List, Optional
-
 
 SLURM_JOB_SCRIPT_TEMPLATE = """\
 #!/bin/bash
@@ -27,29 +27,37 @@ SLURM_JOB_SCRIPT_TEMPLATE = """\
 
 {conda_env_setup}
 
-retval=$?
-if [ $retval -ne 0 ] ; then
-  >&2 echo "Failed to activate conda env '$_conda_env_name' on compute node."
+if [ $? -ne 0 ] ; then
+  >&2 echo "Failed to activate conda env '$__env_name' on compute node."
   exit 99
 fi
 
 remote_py_version=$(python -c "print('.'.join(map(str, __import__('sys').version_info[:2])))")
-if [[ "{python_version}" != $remote_py_version ]] ; then
-  >&2 echo "Python version mismatch. Please install Python {python_version} in the compute environment."
+if [[ $remote_py_version != "{python_version}" ]] ; then
+  >&2 echo "Python version mismatch."
+  >&2 echo "Environment '$__env_name' (python=$remote_py_version) does not match task (python={python_version})."
   exit 199
 fi
 
-covalent_version=$(python -c "import covalent; print(covalent.__version__, end='')")
-if [[ $covalent_version != "{covalent_version}" ]] ; then
+covalent_version=$(python -c "import covalent; print(covalent.__version__)")
+if [ $? -ne 0 ] ; then
+  >&2 echo "Covalent may not be installed in the compute environment."
+  >&2 echo "Please install covalent=={covalent_version} in conda env '$__env_name'."
+  exit 299
+elif [[ $covalent_version != "{covalent_version}" ]] ; then
   >&2 echo "Covalent version mismatch."
-  >&2 echo "Compute environment has 'covalent==$covalent_version', user has 'covalent=={covalent_version}'"
+  >&2 echo "Environment '$__env_name' (covalent==$covalent_version) does not match task (covalent=={covalent_version})."
   exit 299
 fi
 
 cloudpickle_version=$(python -c "import cloudpickle; print(cloudpickle.__version__)")
+if [ $? -ne 0 ] ; then
+  >&2 echo "Cloudpickle may not be installed in the compute environment."
+  >&2 echo "Please install cloudpickle=={cloudpickle_version} in the '$__env_name' environment."
+  exit 399
 if [[ $cloudpickle_version != "{cloudpickle_version}" ]] ; then
   >&2 echo "Cloudpickle version mismatch."
-  >&2 echo "Compute environment has 'cloudpickle==$cloudpickle_version', but user has 'cloudpickle=={cloudpickle_version}'"
+  >&2 echo "Environment '$__env_name' (cloudpickle==$cloudpickle_version) does not match task (cloudpickle=={cloudpickle_version})."
   exit 399
 fi
 
@@ -60,21 +68,25 @@ wait
 
 
 class JobScript:
-    """Create a job script for the Slurm cluster."""
+    """Formats an sbatch submit script for the Slurm cluster."""
 
     def __init__(
         self,
         sbatch_options: Optional[Dict[str, str]] = None,
         srun_options: Optional[Dict[str, str]] = None,
         variables: Optional[Dict[str, str]] = None,
-        bashrc_path: Optional[str] = None,
-        conda_env: Optional[str] = None,
+        bashrc_path: Optional[str] = "",
+        conda_env: Optional[str] = "",
         prerun_commands: Optional[List[str]] = None,
-        srun_append: Optional[str] = None,
+        srun_append: Optional[str] = "",
         postrun_commands: Optional[List[str]] = None,
         use_srun: bool = True,
     ):
-        # TODO: docstring
+        """Create a job script formatter.
+
+        Args:
+            See `covalent_slurm_plugin.slurm.SlurmExecutor` for details.
+        """
 
         self._sbatch_options = sbatch_options or {}
         self._srun_options = srun_options or {}
@@ -120,7 +132,7 @@ class JobScript:
             conda_env_name = self._conda_env
             setup_lines.append(f"conda activate {self._conda_env}")
 
-        setup_lines.append(f'_conda_env_name="{conda_env_name}"')
+        setup_lines.insert(0, f'__env_name="{conda_env_name}"')
 
         return "\n".join(setup_lines)
 
@@ -138,12 +150,6 @@ class JobScript:
 
         return cloudpickle.__version__
 
-    @property
-    def prerun_commands(self) -> str:
-        """Get the prerun commands."""
-
-        return "\n".join(self._prerun_commands)
-
     def get_run_commands(
         self,
         remote_py_filename: str,
@@ -153,13 +159,16 @@ class JobScript:
         """Get the run commands."""
 
         # Commands executed before the user's @electron function.
-        if not self._prerun_commands:
-            prerun_cmds = ""
-        else:
-            prerun_cmds = "\n".join(self._prerun_commands)
+        prerun_cmds = "\n".join(self._prerun_commands)
 
         # Command that executes the user's @electron function.
-        if self._use_srun:
+        python_cmd = "python {remote_py_filename} {func_filename} {result_filename}"
+
+        if not self._use_srun:
+            # Invoke python directly.
+            run_cmd = python_cmd
+        else:
+            # Invoke python via srun.
             srun_options = []
             for key, value in self._srun_options.items():
                 if len(key) == 1:
@@ -169,14 +178,14 @@ class JobScript:
 
             run_cmds = [
                 f"srun {' '.join(srun_options)} \\" if srun_options else "srun \\",
-                "  python {remote_py_filename} {func_filename} {result_filename}",
+                f"  {self._srun_append} \\",
+                f"  {python_cmd}",
             ]
-            if self._srun_append:
-                run_cmds.insert(1, f"  {self._srun_append} \\")
+            if not self._srun_append:
+                # Remove (empty) commands appended to `srun` call.
+                run_cmds.pop(1)
 
             run_cmd = "\n".join(run_cmds)
-        else:
-            run_cmd = "python {remote_py_filename} {func_filename} {result_filename}"
 
         run_cmd = run_cmd.format(
             remote_py_filename=remote_py_filename,
@@ -185,21 +194,13 @@ class JobScript:
         )
 
         # Commands executed after the user's @electron function.
-        if not self._postrun_commands:
-            postrun_cmds = ""
-        else:
-            postrun_cmds = "\n".join(self._postrun_commands)
+        postrun_cmds = "\n".join(self._postrun_commands)
 
+        # Combine all commands.
         run_commands = [prerun_cmds, run_cmd, postrun_cmds]
         run_commands = [cmd for cmd in run_commands if cmd]
 
         return "\n\n".join(run_commands)
-
-    @property
-    def postrun_commands(self) -> str:
-        """Get the postrun commands."""
-
-        return "\n".join(self._postrun_commands)
 
     def format(
         self,
