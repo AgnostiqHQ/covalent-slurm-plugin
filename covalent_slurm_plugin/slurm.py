@@ -59,7 +59,7 @@ class ExecutorPluginDefaults(BaseModel):
     srun_append: Optional[str] = ""
     bashrc_path: Optional[str] = "$HOME/.bashrc"
     slurm_path: Optional[str] = "/usr/bin"
-    poll_freq: int = 60
+    poll_freq: int = 10
     cleanup: bool = True
     cache_dir: Optional[str] = str(
         Path.home() / ".config/covalent/executor_plugins/covalent-slurm-cache"
@@ -175,9 +175,9 @@ class SlurmExecutor(AsyncBaseExecutor):
             else cleanup
         )
         # Force minimum value on `poll_freq`.
-        if self.poll_freq < 60:
-            app_log.info("Increasing poll_freq to the minimum for Slurm: 60 seconds.")
-            self.poll_freq = 60
+        if self.poll_freq < 10:
+            app_log.info("Increasing poll_freq to the minimum allowed: 10 seconds.")
+            self.poll_freq = 10
 
         # Create cache dir if it doesn't exist.
         if not self.cache_dir.exists():
