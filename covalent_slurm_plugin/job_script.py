@@ -42,7 +42,7 @@ fi
 covalent_version=$(python -c "import covalent; print(covalent.__version__)")
 if [ $? -ne 0 ] ; then
   >&2 echo "Covalent may not be installed in the compute environment."
-  >&2 echo "Please install covalent=={covalent_version} in conda env '$__env_name'."
+  >&2 echo "Please install covalent=={covalent_version} in the '$__env_name' conda env."
   exit 299
 elif [[ $covalent_version != "{covalent_version}" ]] ; then
   >&2 echo "Covalent version mismatch."
@@ -53,7 +53,7 @@ fi
 cloudpickle_version=$(python -c "import cloudpickle; print(cloudpickle.__version__)")
 if [ $? -ne 0 ] ; then
   >&2 echo "Cloudpickle may not be installed in the compute environment."
-  >&2 echo "Please install cloudpickle=={cloudpickle_version} in the '$__env_name' environment."
+  >&2 echo "Please install cloudpickle=={cloudpickle_version} in the '$__env_name' conda env."
   exit 399
 elif [[ $cloudpickle_version != "{cloudpickle_version}" ]] ; then
   >&2 echo "Cloudpickle version mismatch."
