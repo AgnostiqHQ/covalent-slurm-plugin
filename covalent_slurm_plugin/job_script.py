@@ -55,7 +55,7 @@ if [ $? -ne 0 ] ; then
   >&2 echo "Cloudpickle may not be installed in the compute environment."
   >&2 echo "Please install cloudpickle=={cloudpickle_version} in the '$__env_name' environment."
   exit 399
-if [[ $cloudpickle_version != "{cloudpickle_version}" ]] ; then
+elif [[ $cloudpickle_version != "{cloudpickle_version}" ]] ; then
   >&2 echo "Cloudpickle version mismatch."
   >&2 echo "Environment '$__env_name' (cloudpickle==$cloudpickle_version) does not match task (cloudpickle=={cloudpickle_version})."
   exit 399

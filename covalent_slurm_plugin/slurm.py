@@ -21,7 +21,7 @@ import re
 import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import aiofiles
 import asyncssh
@@ -275,13 +275,15 @@ class SlurmExecutor(AsyncBaseExecutor):
         py_filename: str,
         func_filename: str,
         result_filename: str,
-        current_remote_workdir: str
+        current_remote_workdir: str,
     ) -> str:
         """Create the SLURM that defines the job, uses srun to run the python script.
 
         Args:
             python_version: Python version required by the pickled function.
             py_filename: Name of the python script.
+            func_filename: Name of the pickled function file.
+            result_filename: Name of the pickled result file.
             current_remote_workdir: Current working directory on the remote machine.
 
         Returns:
@@ -310,7 +312,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         )
 
     async def get_status(
-        self, info_dict: dict, conn: asyncssh.SSHClientConnection
+        self,
+        info_dict: dict,
+        conn: asyncssh.SSHClientConnection,
     ) -> Union[Result, str]:
         """Query the status of a job previously submitted to Slurm.
 
@@ -346,7 +350,11 @@ class SlurmExecutor(AsyncBaseExecutor):
         proc = await conn.run(cmd_scontrol)
         return proc.stdout.strip()
 
-    async def _poll_slurm(self, job_id: int, conn: asyncssh.SSHClientConnection) -> str:
+    async def _poll_slurm(
+        self,
+        job_id: int,
+        conn: asyncssh.SSHClientConnection,
+    ) -> str:
         """Poll a Slurm job until completion.
 
         Args:
@@ -376,11 +384,13 @@ class SlurmExecutor(AsyncBaseExecutor):
         task_results_dir: Path,
         conn: asyncssh.SSHClientConnection,
         current_remote_workdir: Path,
-    ) -> Any:
+    ) -> Tuple[str, str]:
         """Query and retrieve the task logs including stdout and stderr logs.
 
         Args:
             task_metadata: Dictionary of metadata associated with the task.
+            conn: SSH connection object.
+            current_remote_workdir: Current working directory on the remote machine.
 
         Returns:
             stdout and stderr
@@ -408,13 +418,14 @@ class SlurmExecutor(AsyncBaseExecutor):
         task_results_dir: Path,
         conn: asyncssh.SSHClientConnection,
         current_remote_workdir: Path,
-    ) -> Any:
+    ) -> Tuple[Any, str, str, Optional[Exception]]:
         """Query and retrieve the task result including stdout and stderr logs.
 
         Args:
             result_filename: Name of the pickled result file.
             task_results_dir: Directory on the Covalent server where the result will be copied.
             conn: SSH connection object.
+            current_remote_workdir: Current working directory on the remote machine.
         Returns:
             result: Task result.
         """
@@ -438,7 +449,13 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         return result, stdout, stderr, exception
 
-    async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
+    async def run(
+        self,
+        function: Callable,
+        args: List,
+        kwargs: Dict,
+        task_metadata: Dict
+    ) -> Optional[Any]:
         """Run a function on a remote machine using Slurm.
 
         Args:
@@ -596,7 +613,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         return result
 
-    async def teardown(self, task_metadata: Dict):
+    async def teardown(self, task_metadata: Dict) -> None:
         """Perform cleanup on remote machine.
 
         Args:
