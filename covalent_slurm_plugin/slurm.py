@@ -21,7 +21,7 @@ import re
 import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import aiofiles
 import asyncssh
@@ -31,37 +31,53 @@ from covalent._results_manager.result import Result
 from covalent._shared_files import logger
 from covalent._shared_files.config import get_config
 from covalent.executor.base import AsyncBaseExecutor
+from pydantic import BaseModel, Field
 
 from covalent_slurm_plugin.job_script import JobScript
+
+__all__ = ["SlurmExecutor"]
+
+EXECUTOR_PLUGIN_NAME = "SlurmExecutor"
+
+
+class ExecutorPluginDefaults(BaseModel):
+    """Defaults for the SlurmExecutor plugin."""
+
+    username: Optional[str] = None
+    address: Optional[str] = None
+    ssh_key_file: Optional[str] = None
+    cert_file: Optional[str] = None
+    remote_workdir: Optional[str] = "covalent-workdir"
+    create_unique_workdir: bool = False
+    variables: Optional[Dict[str, str]] = Field(default_factory=dict)
+    conda_env: Optional[str] = ""
+    options: Optional[Dict] = Field(default_factory=lambda: {"parsable": ""})
+    prerun_commands: Optional[List[str]] = Field(default_factory=list)
+    postrun_commands: Optional[List[str]] = Field(default_factory=list)
+    use_srun: bool = True
+    srun_options: Optional[Dict] = Field(default_factory=dict)
+    srun_append: Optional[str] = ""
+    bashrc_path: Optional[str] = "$HOME/.bashrc"
+    slurm_path: Optional[str] = "/usr/bin"
+    poll_freq: int = 60
+    cleanup: bool = True
+    cache_dir: Optional[str] = str(
+        Path.home() / ".config/covalent/executor_plugins/covalent-slurm-cache"
+    )
+
+
+_EXECUTOR_PLUGIN_DEFAULTS = ExecutorPluginDefaults().model_dump()
 
 app_log = logger.app_log
 log_stack_info = logger.log_stack_info
 
-_EXECUTOR_PLUGIN_DEFAULTS = {
-    "username": "",
-    "address": "",
-    "ssh_key_file": "",
-    "cert_file": None,
-    "remote_workdir": "covalent-workdir",
-    "create_unique_workdir": False,
-    "variables": {},
-    "conda_env": "",
-    "options": {
-        "parsable": "",
-    },
-    "prerun_commands": None,
-    "postrun_commands": None,
-    "use_srun": True,
-    "srun_options": {},
-    "srun_append": None,
-    "bashrc_path": "$HOME/.bashrc",
-    "slurm_path": None,
-    "cache_dir": str(Path(get_config("dispatcher.cache_dir")).expanduser().resolve()),
-    "poll_freq": 60,
-    "cleanup": True,
-}
-
-executor_plugin_name = "SlurmExecutor"
+_LOAD_SLURM_PREFIX = """\
+source /etc/profile
+module whatis slurm &> /dev/null
+if [ $? -eq 0 ] ; then
+  module load slurm
+fi
+"""
 
 
 class SlurmExecutor(AsyncBaseExecutor):
@@ -74,9 +90,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         cert_file: Certificate file used to authenticate over SSH, if required (usually has extension .pub).
         remote_workdir: Working directory on the remote cluster.
         create_unique_workdir: Whether to create a unique working (sub)directory for each task.
+        options: Dictionary of parameters used to build a Slurm submit script.
         variables: A dictionary of environment variables to declare before job execution.
         conda_env: Name of conda environment on which to run the function. Use "base" for the base environment or "" for no conda.
-        options: Dictionary of parameters used to build a Slurm submit script.
         prerun_commands: List of shell commands to run before running the pickled function.
         postrun_commands: List of shell commands to run after running the pickled function.
         use_srun: Whether or not to run the pickled Python function with srun. If your function itself makes srun or mpirun calls, set this to False.
@@ -84,9 +100,9 @@ class SlurmExecutor(AsyncBaseExecutor):
         srun_append: Command nested into srun call.
         bashrc_path: Path to the bashrc file to source before running the function.
         slurm_path: Path to the slurm commands if they are not found automatically.
-        cache_dir: Local cache directory used by this executor for temporary files.
         poll_freq: Frequency with which to poll a submitted job. Always is >= 60.
         cleanup: Whether to perform cleanup or not on remote machine.
+        cache_dir: Local cache directory used by this executor for temporary files.
         log_stdout: The path to the file to be used for redirecting stdout.
         log_stderr: The path to the file to be used for redirecting stderr.
         time_limit: time limit for the task
@@ -95,109 +111,77 @@ class SlurmExecutor(AsyncBaseExecutor):
 
     def __init__(
         self,
-        username: str = None,
-        address: str = None,
-        ssh_key_file: str = None,
-        cert_file: str = None,
-        remote_workdir: str = None,
-        create_unique_workdir: bool = None,
-        variables: Dict[str, str] = None,
-        conda_env: str = None,
-        options: Dict = None,
-        prerun_commands: List[str] = None,
-        postrun_commands: List[str] = None,
-        use_srun: bool = None,
-        srun_options: Dict = None,
-        srun_append: str = None,
-        bashrc_path: str = None,
-        slurm_path: str = None,
-        cache_dir: str = None,
-        poll_freq: int = None,
-        cleanup: bool = None,
+        username: Optional[str] = None,
+        address: Optional[str] = None,
+        ssh_key_file: Optional[str] = None,
+        cert_file: Optional[str] = None,
+        remote_workdir: Optional[str] = None,
+        create_unique_workdir: bool = False,
+        options: Optional[Dict] = None,
+        variables: Optional[Dict[str, str]] = None,
+        conda_env: Optional[str] = None,
+        prerun_commands: Optional[List[str]] = None,
+        postrun_commands: Optional[List[str]] = None,
+        use_srun: Optional[bool] = None,
+        srun_options: Optional[Dict] = None,
+        srun_append: Optional[str] = None,
+        bashrc_path: Optional[str] = None,
+        slurm_path: Optional[str] = None,
+        poll_freq: Optional[int] = None,
+        cleanup: Optional[bool] = None,
+        cache_dir: Optional[str] = None,
+        *,
         log_stdout: str = "",
         log_stderr: str = "",
         time_limit: int = -1,
         retries: int = 0,
     ):
         super().__init__(
-            log_stdout=log_stdout, log_stderr=log_stderr, time_limit=time_limit, retries=retries
+            log_stdout=log_stdout,
+            log_stderr=log_stderr,
+            time_limit=time_limit,
+            retries=retries
         )
 
         self.username = username or get_config("executors.slurm.username")
         self.address = address or get_config("executors.slurm.address")
+        self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
+        self.cert_file = cert_file or get_config("executors.slurm").get("cert_file", None)
+        self.remote_workdir = remote_workdir or get_config("executors.slurm.remote_workdir")
+        self.variables = variables or get_config("executors.slurm.variables")
+        self.conda_env = conda_env or get_config("executors.slurm.conda_env")
+        self.prerun_commands = prerun_commands or get_config("executors.slurm.prerun_commands")
+        self.postrun_commands = postrun_commands or get_config("executors.slurm.postrun_commands")
+        self.srun_append = srun_append or get_config("executors.slurm.srun_append")
+        self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
+        self.bashrc_path = bashrc_path or get_config("executors.slurm.bashrc_path")
+        self.poll_freq = poll_freq or get_config("executors.slurm.poll_freq")
+        self.cache_dir = Path(cache_dir or get_config("executors.slurm.cache_dir"))
 
-        self.ssh_key_file = Path(ssh_key_file or get_config("executors.slurm.ssh_key_file"))
-
-        try:
-            cert_file = cert_file or get_config("executors.slurm.cert_file")
-            self.cert_file = Path(cert_file) if cert_file else None
-        except KeyError:
-            self.cert_file = None
-
-        self.remote_workdir = Path(remote_workdir or get_config("executors.slurm.remote_workdir"))
+        self.srun_options = deepcopy(srun_options or get_config("executors.slurm.srun_options"))
+        self.options = deepcopy(options or get_config("executors.slurm.options"))
+        self.options.update(parsable="")
 
         self.create_unique_workdir = (
-            get_config("executors.slurm.create_unique_workdir")
-            if create_unique_workdir is None
+            get_config("executors.slurm.create_unique_workdir") if create_unique_workdir is None
             else create_unique_workdir
         )
-
-        self.variables = variables or get_config("executors.slurm.variables")
-
-        try:
-            self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
-        except KeyError:
-            self.slurm_path = None
-
-        try:
-            self.conda_env = (
-                get_config("executors.slurm.conda_env") if conda_env is None else conda_env
-            )
-        except KeyError:
-            self.conda_env = None
-
-        try:
-            self.bashrc_path = (
-                get_config("executors.slurm.bashrc_path") if bashrc_path is None else bashrc_path
-            )
-        except KeyError:
-            self.bashrc_path = None
-
-        self.cache_dir = Path(cache_dir or get_config("executors.slurm.cache_dir"))
-        if not self.cache_dir.exists():
-            self.cache_dir.mkdir()
-
-        # To allow passing empty dictionary
-        if options is None:
-            options = get_config("executors.slurm.options")
-        self.options = deepcopy(options)
-
-        self.use_srun = get_config("executors.slurm.use_srun") if use_srun is None else use_srun
-
-        if srun_options is None:
-            srun_options = get_config("executors.slurm.srun_options")
-        self.srun_options = deepcopy(srun_options)
-
-        try:
-            self.srun_append = srun_append or get_config("executors.slurm.srun_append")
-        except KeyError:
-            self.srun_append = None
-
-        self.prerun_commands = list(prerun_commands) if prerun_commands else []
-        self.postrun_commands = list(postrun_commands) if postrun_commands else []
-
-        self.poll_freq = poll_freq or get_config("executors.slurm.poll_freq")
+        self.use_srun = (
+            get_config("executors.slurm.use_srun") if use_srun is None
+            else use_srun
+        )
+        self.cleanup = (
+            get_config("executors.slurm.cleanup") if cleanup is None
+            else cleanup
+        )
+        # Force minimum value on `poll_freq`.
         if self.poll_freq < 60:
-            print("Polling frequency will be increased to the minimum for Slurm: 60 seconds.")
+            app_log.info("Increasing poll_freq to the minimum for Slurm: 60 seconds.")
             self.poll_freq = 60
 
-        self.cleanup = get_config("executors.slurm.cleanup") if cleanup is None else cleanup
-
-        # Ensure that the slurm data is parsable
-        if "parsable" not in self.options:
-            self.options["parsable"] = ""
-
-        self.LOAD_SLURM_PREFIX = "source /etc/profile\n module whatis slurm &> /dev/null\n if [ $? -eq 0 ] ; then\n module load slurm\n fi\n"
+        # Create cache dir if it doesn't exist.
+        if not self.cache_dir.exists():
+            self.cache_dir.mkdir(parents=True)
 
     async def _client_connect(self) -> asyncssh.SSHClientConnection:
         """
@@ -219,11 +203,11 @@ class SlurmExecutor(AsyncBaseExecutor):
         if not self.ssh_key_file:
             raise ValueError("ssh_key_file is a required parameter in the Slurm plugin.")
 
-        if self.cert_file and not self.cert_file.exists():
-            raise FileNotFoundError(f"Certificate file not found: {self.cert_file!s}")
+        if self.cert_file and not Path(self.cert_file).exists():
+            raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
 
-        if not self.ssh_key_file.exists():
-            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file!s}")
+        if not Path(self.ssh_key_file).exists():
+            raise FileNotFoundError(f"SSH key file not found: {self.ssh_key_file}")
 
         if self.cert_file:
             client_keys = [
@@ -245,7 +229,9 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         except Exception as e:
             raise RuntimeError(
-                f"Could not connect to host: '{self.address}' as user: '{self.username}'"
+                f"Could not connect to host: '{self.address}' "
+                f"as user: '{self.username}' "
+                f"with key file: '{self.ssh_key_file}'"
             ) from e
 
         return conn
@@ -318,7 +304,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         return job_script.format(
             python_version=python_version,
-            remote_py_filename=str(self.remote_workdir / py_filename),
+            remote_py_filename=py_filename,
             func_filename=func_filename,
             result_filename=result_filename,
         )
@@ -350,17 +336,17 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         else:
             app_log.debug("Verifying slurm installation for scontrol...")
-            proc_verify_scontrol = await conn.run(self.LOAD_SLURM_PREFIX + "which scontrol")
+            proc_verify_scontrol = await conn.run(_LOAD_SLURM_PREFIX + "which scontrol")
 
             if proc_verify_scontrol.returncode != 0:
                 raise RuntimeError("Please provide `slurm_path` to run scontrol command")
 
-            cmd_scontrol = self.LOAD_SLURM_PREFIX + cmd_scontrol
+            cmd_scontrol = _LOAD_SLURM_PREFIX + cmd_scontrol
 
         proc = await conn.run(cmd_scontrol)
         return proc.stdout.strip()
 
-    async def _poll_slurm(self, job_id: int, conn: asyncssh.SSHClientConnection) -> None:
+    async def _poll_slurm(self, job_id: int, conn: asyncssh.SSHClientConnection) -> str:
         """Poll a Slurm job until completion.
 
         Args:
@@ -383,11 +369,45 @@ class SlurmExecutor(AsyncBaseExecutor):
             await asyncio.sleep(self.poll_freq)
             status = await self.get_status({"job_id": str(job_id)}, conn)
 
-        if "COMPLETED" not in status:
-            raise RuntimeError(f"Job failed with status:\n{status}")
+        return status
+
+    async def _query_logs(
+        self,
+        task_results_dir: Path,
+        conn: asyncssh.SSHClientConnection,
+        current_remote_workdir: Path,
+    ) -> Any:
+        """Query and retrieve the task logs including stdout and stderr logs.
+
+        Args:
+            task_metadata: Dictionary of metadata associated with the task.
+
+        Returns:
+            stdout and stderr
+        """
+
+        stdout_file = task_results_dir / self.options["output"]
+        stderr_file = task_results_dir / self.options["error"]
+
+        await asyncssh.scp((conn, current_remote_workdir / self.options["output"]), stdout_file)
+        await asyncssh.scp((conn, current_remote_workdir / self.options["error"]), stderr_file)
+
+        async with aiofiles.open(stdout_file, "r") as f:
+            stdout = await f.read()
+        await async_os.remove(stdout_file)
+
+        async with aiofiles.open(stderr_file, "r") as f:
+            stderr = await f.read()
+        await async_os.remove(stderr_file)
+
+        return stdout, stderr
 
     async def _query_result(
-        self, result_filename: str, task_results_dir: str, conn: asyncssh.SSHClientConnection
+        self,
+        result_filename: str,
+        task_results_dir: Path,
+        conn: asyncssh.SSHClientConnection,
+        current_remote_workdir: Path,
     ) -> Any:
         """Query and retrieve the task result including stdout and stderr logs.
 
@@ -398,38 +418,23 @@ class SlurmExecutor(AsyncBaseExecutor):
         Returns:
             result: Task result.
         """
-        task_results_dir = Path(task_results_dir)
+        remote_result_filename = current_remote_workdir / result_filename
 
         # Check the result file exists on the remote backend
-        remote_result_filename = self.remote_workdir / result_filename
-
-        proc = await conn.run(f"test -e {remote_result_filename}")
+        proc = await conn.run(f"test -e {remote_result_filename!s}")
         if proc.returncode != 0:
             raise FileNotFoundError(proc.returncode, proc.stderr.strip(), remote_result_filename)
 
         # Copy result file from remote machine to Covalent server
-        local_result_filename = task_results_dir / result_filename
+        local_result_filename = task_results_dir / remote_result_filename.name
         await asyncssh.scp((conn, remote_result_filename), local_result_filename)
-
-        # Copy stdout, stderr from remote machine to Covalent server
-        stdout_file = task_results_dir / Path(self.options["output"]).name
-        stderr_file = task_results_dir / Path(self.options["error"]).name
-
-        await asyncssh.scp((conn, self.options["output"]), stdout_file)
-        await asyncssh.scp((conn, self.options["error"]), stderr_file)
 
         async with aiofiles.open(local_result_filename, "rb") as f:
             contents = await f.read()
             result, exception = pickle.loads(contents)
         await async_os.remove(local_result_filename)
 
-        async with aiofiles.open(stdout_file, "r") as f:
-            stdout = await f.read()
-        await async_os.remove(stdout_file)
-
-        async with aiofiles.open(stderr_file, "r") as f:
-            stderr = await f.read()
-        await async_os.remove(stderr_file)
+        stdout, stderr = await self._query_logs(task_results_dir, conn, current_remote_workdir)
 
         return result, stdout, stderr, exception
 
@@ -447,13 +452,12 @@ class SlurmExecutor(AsyncBaseExecutor):
         """
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
-        results_dir = Path(task_metadata["results_dir"])
-        task_results_dir = results_dir / dispatch_id
+        remote_workdir = Path(self.remote_workdir)
 
         if self.create_unique_workdir:
-            current_remote_workdir = self.remote_workdir / dispatch_id / f"node_{node_id}"
+            current_remote_workdir = remote_workdir / f"{dispatch_id}/node_{node_id}"
         else:
-            current_remote_workdir = self.remote_workdir
+            current_remote_workdir = remote_workdir
 
         result_filename = f"result-{dispatch_id}-{node_id}.pkl"
         slurm_filename = f"slurm-{dispatch_id}-{node_id}.sh"
@@ -461,10 +465,10 @@ class SlurmExecutor(AsyncBaseExecutor):
         func_filename = f"func-{dispatch_id}-{node_id}.pkl"
 
         if "output" not in self.options:
-            self.options["output"] = current_remote_workdir / f"stdout-{dispatch_id}-{node_id}.log"
+            self.options["output"] = f"stdout-{dispatch_id}-{node_id}.log"
 
         if "error" not in self.options:
-            self.options["error"] = current_remote_workdir / f"stderr-{dispatch_id}-{node_id}.log"
+            self.options["error"] = f"stderr-{dispatch_id}-{node_id}.log"
 
         result = None
 
@@ -475,7 +479,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         # Create the remote directory
         app_log.debug("Creating remote work directory %s ...", current_remote_workdir)
-        cmd_mkdir_remote = f"mkdir -p {current_remote_workdir}"
+        cmd_mkdir_remote = f"mkdir -p {current_remote_workdir!s}"
         proc_mkdir_remote = await conn.run(cmd_mkdir_remote)
 
         if client_err := proc_mkdir_remote.stderr.strip():
@@ -487,7 +491,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             await temp_f.write(pickle.dumps((function, args, kwargs)))
             await temp_f.flush()
 
-            remote_func_filename = self.remote_workdir / func_filename
+            remote_func_filename = current_remote_workdir / func_filename
             app_log.debug("Copying pickled function to remote fs: %s ...", remote_func_filename)
             await asyncssh.scp(temp_f.name, (conn, remote_func_filename))
 
@@ -498,12 +502,19 @@ class SlurmExecutor(AsyncBaseExecutor):
             await temp_g.write(python_exec_script)
             await temp_g.flush()
 
-            remote_py_script_filename = self.remote_workdir / py_script_filename
-            app_log.debug("Copying python run-function to remote fs: %s", remote_py_script_filename)
+            remote_py_script_filename = current_remote_workdir / py_script_filename
+            app_log.debug(
+                "Copying python run-function to remote fs: %s",
+                remote_py_script_filename
+            )
             await asyncssh.scp(temp_g.name, (conn, remote_py_script_filename))
 
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_h:
             # Format the SLURM submit script, write to file, and copy to remote filesystem
+            self.options["job-name"] = (
+                self.options.get("job-name", None)
+                or f"covalent-{node_id}-{dispatch_id}"
+            )
             slurm_submit_script = self._format_submit_script(
                 py_version_func,
                 py_script_filename,
@@ -527,26 +538,44 @@ class SlurmExecutor(AsyncBaseExecutor):
             cmd_sbatch = f"export PATH=$PATH:{self.slurm_path} && {cmd_sbatch}"
         else:
             app_log.debug("Verifying slurm installation for sbatch...")
-            proc_verify_sbatch = await conn.run(self.LOAD_SLURM_PREFIX + "which sbatch")
+            proc_verify_sbatch = await conn.run(_LOAD_SLURM_PREFIX + "which sbatch")
             if proc_verify_sbatch.returncode != 0:
                 raise RuntimeError("Please provide `slurm_path` to run sbatch command")
-            cmd_sbatch = self.LOAD_SLURM_PREFIX + cmd_sbatch
+            cmd_sbatch = _LOAD_SLURM_PREFIX + cmd_sbatch
+
+        result = None
+        exception = None
+        stdout = ""
+        stderr = ""
+        task_results_dir = Path(task_metadata["results_dir"]) / dispatch_id
 
         proc = await conn.run(cmd_sbatch)
 
         if proc.returncode != 0:
             raise RuntimeError(proc.stderr.strip())
+        else:
+            app_log.debug("Job submitted with stdout: %s", proc.stdout.strip())
+            slurm_job_id = int(re.findall("[0-9]+", proc.stdout.strip())[0])
 
-        app_log.debug("Job submitted with stdout: %s", proc.stdout.strip())
-        slurm_job_id = int(re.findall("[0-9]+", proc.stdout.strip())[0])
+            app_log.debug("Polling slurm with job_id: %s ...", slurm_job_id)
+            status = await self._poll_slurm(slurm_job_id, conn)
 
-        app_log.debug("Polling slurm with job_id: %s ...", slurm_job_id)
-        await self._poll_slurm(slurm_job_id, conn)
-
-        app_log.debug("Querying result with job_id: %s ...", slurm_job_id)
-        result, stdout, stderr, exception = await self._query_result(
-            result_filename, task_results_dir, conn
-        )
+            if "COMPLETED" in status:
+                app_log.debug("Querying result with job_id: %s ...", slurm_job_id)
+                result, stdout, stderr, exception = await self._query_result(
+                    result_filename,
+                    task_results_dir,
+                    conn,
+                    current_remote_workdir,
+                )
+            else:
+                app_log.debug("Job submission FAILED with status:\n%s\n", status)
+                _, stderr = await self._query_logs(
+                    task_results_dir,
+                    conn,
+                    current_remote_workdir,
+                )
+                exception = RuntimeError(stderr)
 
         print(stdout)
         print(stderr, file=sys.stderr)
@@ -557,8 +586,8 @@ class SlurmExecutor(AsyncBaseExecutor):
         app_log.debug("Preparing for teardown...")
         self._remote_func_filename = remote_func_filename
         self._remote_slurm_filename = remote_slurm_filename
-        self._result_filename = result_filename
         self._remote_py_script_filename = remote_py_script_filename
+        self._result_filename = current_remote_workdir / result_filename
 
         app_log.debug("Closing SSH connection...")
         conn.close()
@@ -580,14 +609,15 @@ class SlurmExecutor(AsyncBaseExecutor):
             try:
                 app_log.debug("Performing cleanup on remote...")
                 conn = await self._client_connect()
+                remote_workdir = self._result_filename.parent
                 await self.perform_cleanup(
                     conn=conn,
                     remote_func_filename=self._remote_func_filename,
                     remote_slurm_filename=self._remote_slurm_filename,
                     remote_py_filename=self._remote_py_script_filename,
-                    remote_result_filename=self.remote_workdir / self._result_filename,
-                    remote_stdout_filename=self.options["output"],
-                    remote_stderr_filename=self.options["error"],
+                    remote_result_filename=self._result_filename,
+                    remote_stdout_filename=remote_workdir / self.options["output"],
+                    remote_stderr_filename=remote_workdir / self.options["error"],
                 )
 
                 app_log.debug("Closing SSH connection...")
