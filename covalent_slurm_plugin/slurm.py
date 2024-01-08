@@ -137,10 +137,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         retries: int = 0,
     ):
         super().__init__(
-            log_stdout=log_stdout,
-            log_stderr=log_stderr,
-            time_limit=time_limit,
-            retries=retries
+            log_stdout=log_stdout, log_stderr=log_stderr, time_limit=time_limit, retries=retries
         )
 
         self.username = username or get_config("executors.slurm.username")
@@ -163,17 +160,12 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.options.update(parsable="")
 
         self.create_unique_workdir = (
-            get_config("executors.slurm.create_unique_workdir") if create_unique_workdir is None
+            get_config("executors.slurm.create_unique_workdir")
+            if create_unique_workdir is None
             else create_unique_workdir
         )
-        self.use_srun = (
-            get_config("executors.slurm.use_srun") if use_srun is None
-            else use_srun
-        )
-        self.cleanup = (
-            get_config("executors.slurm.cleanup") if cleanup is None
-            else cleanup
-        )
+        self.use_srun = get_config("executors.slurm.use_srun") if use_srun is None else use_srun
+        self.cleanup = get_config("executors.slurm.cleanup") if cleanup is None else cleanup
         # Force minimum value on `poll_freq`.
         if self.poll_freq < 10:
             app_log.info("Increasing poll_freq to the minimum allowed: 10 seconds.")
@@ -447,7 +439,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         stdout, stderr = await self._query_logs(
             task_results_dir=task_results_dir,
             current_remote_workdir=remote_result_filename.parent,
-            conn=conn
+            conn=conn,
         )
 
         return result, stdout, stderr, exception
@@ -518,23 +510,21 @@ class SlurmExecutor(AsyncBaseExecutor):
 
             remote_py_script_filename = current_remote_workdir / py_script_filename
             app_log.debug(
-                "Copying python run-function to remote fs: %s",
-                remote_py_script_filename
+                "Copying python run-function to remote fs: %s", remote_py_script_filename
             )
             await asyncssh.scp(temp_g.name, (conn, remote_py_script_filename))
 
         # Format the SLURM submit script, write to file, and copy to remote filesystem
         async with aiofiles.tempfile.NamedTemporaryFile(dir=self.cache_dir, mode="w") as temp_h:
             self.options["job-name"] = (
-                self.options.get("job-name", None)
-                or f"covalent-{node_id}-{dispatch_id}"
+                self.options.get("job-name", None) or f"covalent-{node_id}-{dispatch_id}"
             )
             slurm_submit_script = self._format_submit_script(
                 python_version=py_version_func,
                 py_filename=py_script_filename,
                 func_filename=func_filename,
                 result_filename=result_filename,
-                current_remote_workdir=current_remote_workdir
+                current_remote_workdir=current_remote_workdir,
             )
             app_log.debug("Writing slurm submit script to tempfile...")
             await temp_h.write(slurm_submit_script)
@@ -552,11 +542,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         }
 
     async def run(
-        self,
-        function: Callable,
-        args: List,
-        kwargs: Dict,
-        task_metadata: Dict
+        self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict
     ) -> Optional[Any]:
         """Run a function on a remote machine using Slurm.
 
@@ -585,11 +571,11 @@ class SlurmExecutor(AsyncBaseExecutor):
             dispatch_id=dispatch_id,
             node_id=node_id,
             func_tuple=(function, args, kwargs),
-            conn=conn
+            conn=conn,
         )
 
         # Submit the job script with `sbatch`.
-        app_log.debug("Running the script: %s", remote_paths['slurm'])
+        app_log.debug("Running the script: %s", remote_paths["slurm"])
         cmd_sbatch = f"sbatch {remote_paths['slurm']}"
         if self.slurm_path:
             app_log.debug("Exporting slurm path for sbatch...")

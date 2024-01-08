@@ -226,10 +226,10 @@ class JobScript:
         existing_keys = set(template_kwargs.keys())
         required_keys = set(re.findall(r"\{(\w+)\}", SLURM_JOB_SCRIPT_TEMPLATE))
 
-        if (missing_keys := required_keys - existing_keys):
+        if missing_keys := required_keys - existing_keys:
             raise ValueError(f"Missing required keys: {', '.join(missing_keys)}")
 
-        if (extra_keys := existing_keys - required_keys):
+        if extra_keys := existing_keys - required_keys:
             raise ValueError(f"Unexpected keys: {', '.join(extra_keys)}")
 
         return SLURM_JOB_SCRIPT_TEMPLATE.format(**template_kwargs)

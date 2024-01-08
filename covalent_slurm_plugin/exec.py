@@ -36,22 +36,21 @@ def _check_setup() -> None:
         import covalent
 
     except ImportError as _exception:
-
         msg = "The covalent SDK is not installed in the Slurm job environment."
         exception = _exception
 
     except filelock._error.Timeout as _exception:
-
         config_location = os.getenv("COVALENT_CONFIG_DIR", "~/.config/covalent")
         config_location = os.path.expanduser(config_location)
         config_file = os.path.join(config_location, "covalent.conf")
 
-        msg = "\n".join([
-            f"Failed to acquire file lock '{config_file}.lock' on Slurm cluster filesystem. "
-            f"Consider overriding the current config location ('{config_location}'), e.g:",
-            '    SlurmExecutor(..., variables={"COVALENT_CONFIG_DIR": "/tmp"})'
-            ''
-        ])
+        msg = "\n".join(
+            [
+                f"Failed to acquire file lock '{config_file}.lock' on Slurm cluster filesystem. "
+                f"Consider overriding the current config location ('{config_location}'), e.g:",
+                '    SlurmExecutor(..., variables={"COVALENT_CONFIG_DIR": "/tmp"})' "",
+            ]
+        )
         exception = _exception
 
     # Raise the exception if one was caught
