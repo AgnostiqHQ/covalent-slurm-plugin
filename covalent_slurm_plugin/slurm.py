@@ -43,9 +43,9 @@ EXECUTOR_PLUGIN_NAME = "SlurmExecutor"
 class ExecutorPluginDefaults(BaseModel):
     """Defaults for the SlurmExecutor plugin."""
 
-    username: Optional[str] = None
-    address: Optional[str] = None
-    ssh_key_file: Optional[str] = None
+    username: Optional[str] = ""
+    address: Optional[str] = ""
+    ssh_key_file: Optional[str] = ""
     cert_file: Optional[str] = None
     remote_workdir: Optional[str] = "covalent-workdir"
     create_unique_workdir: bool = False
