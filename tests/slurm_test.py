@@ -160,9 +160,6 @@ def test_init():
     assert executor.poll_freq == 5
 
 
-# TODO: should conda and source be in there as expected?
-
-
 def test_format_submit_script_default():
     """Test that the shell script (in string form) which is to be submitted on
     the remote server is created with no errors."""
