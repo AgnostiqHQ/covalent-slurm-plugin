@@ -50,10 +50,7 @@ def test_setup_filelock_timeout_error():
     )
 
     with patched_import_covalent:
-        with pytest.raises(
-            RuntimeError,
-            match="Failed to acquire file lock"
-        ):
+        with pytest.raises(RuntimeError, match="Failed to acquire file lock"):
             exec_script._check_setup()
 
 
@@ -75,9 +72,7 @@ def test_execute():
         f.flush()
         f.seek(0)
 
-        patched_sys_argv = mock.patch.object(
-            sys, "argv", ["", f.name]
-        )
+        patched_sys_argv = mock.patch.object(sys, "argv", ["", f.name])
 
         with patched_import_covalent, patched_sys_argv:
             result_dict = exec_script._execute()
@@ -106,9 +101,7 @@ def test_execute_with_error():
         f.flush()
         f.seek(0)
 
-        patched_sys_argv = mock.patch.object(
-            sys, "argv", ["", f.name]
-        )
+        patched_sys_argv = mock.patch.object(sys, "argv", ["", f.name])
 
         with patched_import_covalent, patched_sys_argv:
             result_dict = exec_script._execute()
@@ -129,14 +122,11 @@ def test_main():
     )
     patched_execute = mock.patch(
         "covalent_slurm_plugin.exec._execute",
-        return_value={"result": _fake_result, "exception": None}
+        return_value={"result": _fake_result, "exception": None},
     )
 
     with tempfile.NamedTemporaryFile("wb") as f:
-
-        patched_sys_argv = mock.patch.object(
-            sys, "argv", ["", "fake_func_filename", f.name]
-        )
+        patched_sys_argv = mock.patch.object(sys, "argv", ["", "fake_func_filename", f.name])
 
         with patched_import_covalent, patched_sys_argv, patched_execute:
             # Write the result to the temporary file.
@@ -163,14 +153,11 @@ def test_main_with_error():
     )
     patched_execute = mock.patch(
         "covalent_slurm_plugin.exec._execute",
-        return_value={"result": None, "exception": _fake_exception}
+        return_value={"result": None, "exception": _fake_exception},
     )
 
     with tempfile.NamedTemporaryFile("wb") as f:
-
-        patched_sys_argv = mock.patch.object(
-            sys, "argv", ["", "fake_func_filename", f.name]
-        )
+        patched_sys_argv = mock.patch.object(sys, "argv", ["", "fake_func_filename", f.name])
 
         with patched_import_covalent, patched_sys_argv, patched_execute:
             # Write the result to the temporary file.
