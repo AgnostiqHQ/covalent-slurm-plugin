@@ -25,16 +25,15 @@ import pytest
 def test_setup_import_error():
     """Test error message correctly reported in case of ImportError"""
     patched_import_covalent = mock.patch(
-        "covalent_slurm_plugin.exec._import_covalent",
-        side_effect=ImportError()
+        "covalent_slurm_plugin.exec._import_covalent", side_effect=ImportError()
     )
 
     with patched_import_covalent:
         with pytest.raises(
-            RuntimeError,
-            match="The covalent SDK is not installed in the Slurm job environment."
+            RuntimeError, match="The covalent SDK is not installed in the Slurm job environment."
         ):
             from covalent_slurm_plugin import exec
+
             exec._check_setup()
 
 
@@ -42,13 +41,11 @@ def test_setup_filelock_timeout_error():
     """Test error message correctly reported in case of filelock Timeout error"""
     patched_import_covalent = mock.patch(
         "covalent_slurm_plugin.exec._import_covalent",
-        side_effect=filelock._error.Timeout("nonexistent_lock_file")
+        side_effect=filelock._error.Timeout("nonexistent_lock_file"),
     )
 
     with patched_import_covalent:
-        with pytest.raises(
-            RuntimeError,
-            match="Failed to acquire file lock"
-        ):
+        with pytest.raises(RuntimeError, match="Failed to acquire file lock"):
             from covalent_slurm_plugin import exec
+
             exec._check_setup()
