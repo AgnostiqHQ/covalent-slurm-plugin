@@ -161,7 +161,9 @@ def test_init():
 
     assert executor.poll_freq == 5
 
+
 # TODO: should conda and source be in there as expected?
+
 
 def test_format_submit_script_default():
     """Test that the shell script (in string form) which is to be submitted on
@@ -503,9 +505,7 @@ async def test_query_result(mocker, proc_mock, conn_mock):
 
     try:
         await executor._query_result(
-            remote_result_filename=Path("mock_result"),
-            task_results_dir=Path("."),
-            conn=conn_mock
+            remote_result_filename=Path("mock_result"), task_results_dir=Path("."), conn=conn_mock
         )
     except Exception as raised_exception:
         expected_exception = FileNotFoundError(1, "stderr")
@@ -544,9 +544,7 @@ async def test_query_result(mocker, proc_mock, conn_mock):
 
     with mock.patch("aiofiles.threadpool.sync_open", mock_open):
         result, stdout, stderr, exception = await executor._query_result(
-            remote_result_filename=Path("mock_result"),
-            task_results_dir=Path("."),
-            conn=conn_mock
+            remote_result_filename=Path("mock_result"), task_results_dir=Path("."), conn=conn_mock
         )
 
         assert result == expected_results

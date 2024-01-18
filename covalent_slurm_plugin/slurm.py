@@ -159,8 +159,7 @@ class SlurmExecutor(AsyncBaseExecutor):
 
         # Allow user to override bashrc_path with empty string.
         self.bashrc_path = (
-            "" if bashrc_path == ""
-            else (bashrc_path or get_config("executors.slurm.bashrc_path"))
+            "" if bashrc_path == "" else (bashrc_path or get_config("executors.slurm.bashrc_path"))
         )
 
         self.srun_options = deepcopy(srun_options or get_config("executors.slurm.srun_options"))
