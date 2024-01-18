@@ -22,6 +22,11 @@ import sys
 import cloudpickle as pickle
 
 
+def _import_covalent() -> None:
+    # Wrapped import for convenience in testing.
+    import covalent
+
+
 def _check_setup() -> None:
     """Use these checks to create more informative error messages."""
 
@@ -33,7 +38,7 @@ def _check_setup() -> None:
     try:
         # covalent is needed because the @electron function
         # executes inside `wrapper_fn` to apply deps
-        import covalent
+        _import_covalent()
 
     except ImportError as _exception:
         msg = "The covalent SDK is not installed in the Slurm job environment."
