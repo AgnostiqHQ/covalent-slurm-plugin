@@ -79,6 +79,9 @@ if [ $? -eq 0 ] ; then
 fi
 """
 
+# TODO: consider enumerating job statuses
+# TODO: capture poll_freq errors and inform user
+
 
 class SlurmExecutor(AsyncBaseExecutor):
     """Slurm executor plugin class.
@@ -151,9 +154,14 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.postrun_commands = postrun_commands or get_config("executors.slurm.postrun_commands")
         self.srun_append = srun_append or get_config("executors.slurm.srun_append")
         self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
-        self.bashrc_path = bashrc_path or get_config("executors.slurm.bashrc_path")
         self.poll_freq = poll_freq or get_config("executors.slurm.poll_freq")
         self.cache_dir = Path(cache_dir or get_config("executors.slurm.cache_dir"))
+
+        # Allow user to override bashrc_path with empty string.
+        self.bashrc_path = (
+            "" if bashrc_path == ""
+            else (bashrc_path or get_config("executors.slurm.bashrc_path"))
+        )
 
         self.srun_options = deepcopy(srun_options or get_config("executors.slurm.srun_options"))
         self.options = deepcopy(options or get_config("executors.slurm.options"))
