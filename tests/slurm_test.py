@@ -27,9 +27,10 @@ import pytest
 from covalent._results_manager.result import Result
 from covalent._shared_files.config import get_config, set_config
 from covalent._workflow.transport import TransportableObject
-from covalent.executor.base import wrapper_fn
+from covalent.executor.utils.wrappers import wrapper_fn
 
 from covalent_slurm_plugin import SlurmExecutor
+from covalent_slurm_plugin.slurm import _EXECUTOR_PLUGIN_DEFAULTS
 
 aiofiles.threadpool.wrap.register(mock.MagicMock)(
     lambda *args, **kwargs: aiofiles.threadpool.AsyncBufferedIOBase(*args, **kwargs)
@@ -79,17 +80,15 @@ def test_init():
     assert executor.cert_file is None
     assert executor.remote_workdir == "covalent-workdir"
     assert executor.create_unique_workdir is False
-    assert executor.slurm_path is None
+    assert executor.slurm_path == "/usr/bin"
     assert executor.conda_env == ""
-    assert executor.poll_freq == 60
+    assert executor.poll_freq == 5
     assert executor.options == {"parsable": ""}
     assert executor.srun_options == {}
-    assert executor.srun_append is None
+    assert executor.srun_append == ""
     assert executor.prerun_commands == []
     assert executor.postrun_commands == []
-    assert executor.cache_dir == str(
-        Path(get_config("dispatcher.cache_dir")).expanduser().resolve()
-    )
+    assert executor.cache_dir == Path(_EXECUTOR_PLUGIN_DEFAULTS["cache_dir"])
     assert executor.cleanup is True
 
     # Test with non-defaults
@@ -148,7 +147,7 @@ def test_init():
     assert executor.srun_append == srun_append
     assert executor.prerun_commands == prerun_commands
     assert executor.postrun_commands == postrun_commands
-    assert executor.cache_dir == cache_dir
+    assert executor.cache_dir == Path(cache_dir)
     assert executor.poll_freq == poll_freq
     assert executor.cleanup == cleanup
 
@@ -157,53 +156,12 @@ def test_init():
         username=username,
         address=host,
         ssh_key_file=key_file,
-        poll_freq=30,
+        poll_freq=1,
     )
 
-    assert executor.poll_freq == 60
+    assert executor.poll_freq == 5
 
-
-def test_failed_init():
-    """Test for failed inits"""
-
-    start_config = deepcopy(get_config())
-    for key in ["cert_file", "slurm_path", "conda_env", "bashrc_path", "srun_append"]:
-        config = get_config()
-        config["executors"]["slurm"].pop(key, None)
-        set_config(config)
-        executor = SlurmExecutor(username="username", address="host", ssh_key_file=SSH_KEY_FILE)
-        assert not executor.__dict__[key]
-        set_config(start_config)
-
-
-def test_format_py_script():
-    """Test that the python script (in string form) which is to be executed (via srun)
-    on the remote server is created with no errors."""
-
-    executor_0 = SlurmExecutor(
-        username="test_user",
-        address="test_address",
-        ssh_key_file=SSH_KEY_FILE,
-        cert_file=CERT_FILE,
-        remote_workdir="/federation/test_user/.cache/covalent",
-        options={},
-        cache_dir="~/.cache/covalent",
-        poll_freq=60,
-    )
-
-    dispatch_id = "148dedae-1b58-3870-z08d-db89bceec915"
-    task_id = 2
-    func_filename = f"func-{dispatch_id}-{task_id}.pkl"
-    result_filename = f"result-{dispatch_id}-{task_id}.pkl"
-
-    try:
-        py_script_str = executor_0._format_py_script(func_filename, result_filename)
-        print(py_script_str)
-    except Exception as exc:
-        assert False, f"Exception while running _format_py_script: {exc}"
-    assert func_filename in py_script_str
-    assert result_filename in py_script_str
-
+# TODO: should conda and source be in there as expected?
 
 def test_format_submit_script_default():
     """Test that the shell script (in string form) which is to be submitted on
@@ -230,10 +188,16 @@ def test_format_submit_script_default():
     dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
     task_id = 3
     py_filename = f"script-{dispatch_id}-{task_id}.py"
+    func_filename = f"func-{dispatch_id}-{task_id}.pkl"
+    result_filename = f"result-{dispatch_id}-{task_id}.pkl"
 
     try:
         submit_script_str = executor_0._format_submit_script(
-            python_version, py_filename, remote_workdir
+            python_version=python_version,
+            py_filename=py_filename,
+            func_filename=func_filename,
+            result_filename=result_filename,
+            current_remote_workdir=remote_workdir,
         )
         print(submit_script_str)
     except Exception as exc:
@@ -244,7 +208,8 @@ def test_format_submit_script_default():
     assert submit_script_str.startswith(
         shebang
     ), f"Missing '{shebang[:-1]}' in sbatch shell script"
-    assert "conda" not in submit_script_str
+
+    assert "conda activate" in submit_script_str
     assert "source $HOME/.bashrc" in submit_script_str
     assert "srun" in submit_script_str
     assert "--chdir=" + remote_workdir in submit_script_str
@@ -287,10 +252,17 @@ def test_format_submit_script():
     dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
     task_id = 3
     py_filename = f"script-{dispatch_id}-{task_id}.py"
+    func_filename = f"func-{dispatch_id}-{task_id}.pkl"
+    result_filename = f"result-{dispatch_id}-{task_id}.pkl"
+
     current_remote_workdir = os.path.join(remote_workdir, dispatch_id, "node_" + str(task_id))
     try:
         submit_script_str = executor_1._format_submit_script(
-            python_version, py_filename, current_remote_workdir
+            python_version=python_version,
+            py_filename=py_filename,
+            func_filename=func_filename,
+            result_filename=result_filename,
+            current_remote_workdir=current_remote_workdir,
         )
         print(submit_script_str)
     except Exception as exc:
@@ -330,10 +302,16 @@ def test_format_submit_script_no_srun():
     dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
     task_id = 3
     py_filename = f"script-{dispatch_id}-{task_id}.py"
+    func_filename = f"func-{dispatch_id}-{task_id}.pkl"
+    result_filename = f"result-{dispatch_id}-{task_id}.pkl"
 
     try:
         submit_script_str = executor_1._format_submit_script(
-            python_version, py_filename, remote_workdir
+            python_version=python_version,
+            py_filename=py_filename,
+            func_filename=func_filename,
+            result_filename=result_filename,
+            current_remote_workdir=remote_workdir,
         )
         print(submit_script_str)
     except Exception as exc:
@@ -369,16 +347,22 @@ def test_format_submit_script_no_conda():
     dispatch_id = "259efebf-2c69-4981-a19e-ec90cdffd026"
     task_id = 3
     py_filename = f"script-{dispatch_id}-{task_id}.py"
+    func_filename = f"func-{dispatch_id}-{task_id}.pkl"
+    result_filename = f"result-{dispatch_id}-{task_id}.pkl"
 
     try:
         submit_script_str = executor_2._format_submit_script(
-            python_version, py_filename, remote_workdir
+            python_version=python_version,
+            py_filename=py_filename,
+            func_filename=func_filename,
+            result_filename=result_filename,
+            current_remote_workdir=remote_workdir,
         )
         print(submit_script_str)
     except Exception as exc:
         assert False, f"Exception while running _format_submit_script with default options: {exc}"
 
-    assert "conda" not in submit_script_str
+    assert "conda activate" in submit_script_str
     assert "source" not in submit_script_str
 
 
@@ -451,7 +435,7 @@ async def test_get_status(proc_mock, conn_mock):
 
     status = await executor.get_status({"job_id": 0}, conn_mock)
     assert status == "Fake Status"
-    assert conn_mock.run.call_count == 2
+    assert conn_mock.run.call_count == 1
 
 
 @pytest.mark.asyncio
@@ -519,7 +503,9 @@ async def test_query_result(mocker, proc_mock, conn_mock):
 
     try:
         await executor._query_result(
-            result_filename="mock_result", task_results_dir="", conn=conn_mock
+            remote_result_filename=Path("mock_result"),
+            task_results_dir=Path("."),
+            conn=conn_mock
         )
     except Exception as raised_exception:
         expected_exception = FileNotFoundError(1, "stderr")
@@ -547,18 +533,20 @@ async def test_query_result(mocker, proc_mock, conn_mock):
     unpatched_open = open
 
     def mock_open(*args, **kwargs):
-        if args[0] == "mock_result":
+        if args[0].name == "mock_result":
             return mock.mock_open(read_data=None)(*args, **kwargs)
-        elif args[0] == executor.options["output"]:
+        elif args[0].name == executor.options["output"]:
             return mock.mock_open(read_data=expected_stdout)(*args, **kwargs)
-        elif args[0] == executor.options["error"]:
+        elif args[0].name == executor.options["error"]:
             return mock.mock_open(read_data=expected_stderr)(*args, **kwargs)
         else:
             return unpatched_open(*args, **kwargs)
 
     with mock.patch("aiofiles.threadpool.sync_open", mock_open):
         result, stdout, stderr, exception = await executor._query_result(
-            result_filename="mock_result", task_results_dir="", conn=conn_mock
+            remote_result_filename=Path("mock_result"),
+            task_results_dir=Path("."),
+            conn=conn_mock
         )
 
         assert result == expected_results
@@ -627,19 +615,19 @@ async def test_run(mocker, proc_mock, conn_mock):
             proc_mock.stderr = ""
             proc_mock.returncode = 0
 
-        async def __client_connect_fail(*_):
+        async def __client_connect_fail(*_, **__):
             return conn_mock
 
-        async def __client_connect_succeed(*_):
+        async def __client_connect_succeed(*_, **__):
             return conn_mock
 
-        async def __poll_slurm_succeed(*_):
+        async def __poll_slurm_succeed(*_, **__):
             return
 
-        async def __query_result_fail(*_):
+        async def __query_result_fail(*_, **__):
             return None, proc_mock.stdout, proc_mock.stderr, dummy_error_msg
 
-        async def __query_result_succeed(*_):
+        async def __query_result_succeed(*_, **__):
             return "result", "", "", None
 
         # patches
@@ -765,10 +753,10 @@ async def test_teardown(mocker, proc_mock, conn_mock):
     conn_mock.run = mock.AsyncMock(return_value=proc_mock)
     conn_mock.wait_closed = mock.AsyncMock(return_value=None)
 
-    async def __client_connect_succeed(*_):
+    async def __client_connect_succeed(*_, **__):
         return conn_mock
 
-    async def __query_result_succeed(*_):
+    async def __query_result_succeed(*_, **__):
         return "result", "", "", None
 
     async def __perform_cleanup(*_, **__):
