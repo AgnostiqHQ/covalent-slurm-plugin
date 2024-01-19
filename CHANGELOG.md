@@ -7,13 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
-## Added
+### Added
 
+- add a new `variables` parameter for environment variables
+- add a new error-catching python execution script (add new module)
+- add checks inside submit script for `covalent` and `cloudpickle` versions
+- clean up job script creation (add new module)
 - export `COVALENT_CONFIG_DIR=/tmp` inside sbatch script to enable filelock
 
-## Changed
+### Changed
 
+- update plugin defaults to use `BaseModel` instead of `dict`
+- change to actually get errors from these checks
+- use `Path` everywhere instead of `os.path` operations
+- allow `poll_freq >= 10` seconds, instead of 60 seconds
+- misc. cleanups and refactoring
 - Aesthetics and string formatting
+- remove addition of `COVALENT_CONFIG_DIR=/tmp` to sbatch script
 - Removed the `sshproxy` interface.
 - Updates __init__ signature kwargs replaced with parent for better documentation.
 - Updated license to Apache
