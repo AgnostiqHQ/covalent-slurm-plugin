@@ -1,4 +1,4 @@
-# Copyright 2021 Agnostiq Inc.
+# Copyright 2024 Agnostiq Inc.
 #
 # This file is part of Covalent.
 #
