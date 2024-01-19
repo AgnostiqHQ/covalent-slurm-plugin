@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.17.0] - 2024-01-19
+
 ### Added
 
 - add a new `variables` parameter for environment variables
