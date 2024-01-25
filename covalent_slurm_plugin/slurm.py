@@ -157,6 +157,11 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.poll_freq = poll_freq or get_config("executors.slurm.poll_freq")
         self.cache_dir = Path(cache_dir or get_config("executors.slurm.cache_dir"))
 
+        # Resolve ssh_key_file and cert_file to absolute paths.
+        self.ssh_key_file = Path(self.ssh_key_file).expanduser().resolve()
+        if self.cert_file:
+            self.cert_file = Path(self.cert_file).expanduser().resolve()
+
         # Allow user to override bashrc_path with empty string.
         self.bashrc_path = (
             "" if bashrc_path == "" else (bashrc_path or get_config("executors.slurm.bashrc_path"))

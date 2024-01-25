@@ -20,7 +20,7 @@ import re
 from typing import Dict, List, Optional
 
 SLURM_JOB_SCRIPT_TEMPLATE = """\
-#!/bin/bash
+#!/bin/bash -i
 {sbatch_directives}
 
 {shell_env_setup}
