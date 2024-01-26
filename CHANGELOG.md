@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+
+- `ssh_key_file` and `cert_file` paths will now be expanded and resolved to their absolute paths instead of requiring to be absolute in the first place.
+- Added `ignore_versions` parameter to `SlurmExecutor` to allow for ignoring the versions of `python`, `covalent` and `cloudpickle` when submitting jobs on the remote machine.
+- Added further improved error messages in the slurm script.
+- Added docker file and its dependent files so that the plugin can be tested using a docker container running slurm.
+- Added README.md for the docker tests with steps to manually test the plugin.
+
+### Changed
+
+- Changed the strict version pin of `aiofiles` to be `>=` instead of `==`.
+
+### Removed
+
+- Excluding tests from the built package.
+
 ## [0.17.0] - 2024-01-19
 
 ### Added
