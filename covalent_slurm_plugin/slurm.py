@@ -162,9 +162,10 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.ignore_versions = ignore_versions if ignore_versions is not None else get_config("executors.slurm.ignore_versions")
 
         # Resolve ssh_key_file and cert_file to absolute paths.
-        self.ssh_key_file = Path(self.ssh_key_file).expanduser().resolve()
+        if self.ssh_key_file:
+            self.ssh_key_file = str(Path(self.ssh_key_file).expanduser().resolve())
         if self.cert_file:
-            self.cert_file = Path(self.cert_file).expanduser().resolve()
+            self.cert_file = str(Path(self.cert_file).expanduser().resolve())
 
         # Allow user to override bashrc_path with empty string.
         self.bashrc_path = (
