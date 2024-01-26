@@ -1,2 +1,2 @@
-# Ignore the public key for ssh
-*.pub
+# Ignore the generate keypair for ssh
+slurm_test*
