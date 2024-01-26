@@ -1,0 +1,2 @@
+# Ignore the public key for ssh
+*.pub
