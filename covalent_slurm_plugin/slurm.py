@@ -159,7 +159,11 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
         self.poll_freq = poll_freq or get_config("executors.slurm.poll_freq")
         self.cache_dir = Path(cache_dir or get_config("executors.slurm.cache_dir"))
-        self.ignore_versions = ignore_versions if ignore_versions is not None else get_config("executors.slurm.ignore_versions")
+        self.ignore_versions = (
+            ignore_versions
+            if ignore_versions is not None
+            else get_config("executors.slurm.ignore_versions")
+        )
 
         # Resolve ssh_key_file and cert_file to absolute paths.
         self.ssh_key_file = Path(self.ssh_key_file).expanduser().resolve()

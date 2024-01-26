@@ -127,9 +127,7 @@ class JobScript:
         setup_lines = [
             f"source {self._bashrc_path}" if self._bashrc_path else "",
         ]
-        setup_lines.extend(
-            f'export {key}="{value}"' for key, value in self._variables.items()
-        )
+        setup_lines.extend(f'export {key}="{value}"' for key, value in self._variables.items())
         return "\n".join(setup_lines)
 
     @property
