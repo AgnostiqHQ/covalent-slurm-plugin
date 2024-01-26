@@ -21,7 +21,7 @@ COPY covalent_install.sh /home/slurmuser/covalent_install.sh
 # Run the covalent install file
 RUN chmod +x /home/slurmuser/covalent_install.sh && /home/slurmuser/covalent_install.sh
 
-# change ownership of the key file. 
+# change ownership of the key file.
 RUN chown slurmuser:slurmgroup /home/slurmuser/.ssh/authorized_keys && chmod 600 /home/slurmuser/.ssh/authorized_keys
 
 # Start SSH service
