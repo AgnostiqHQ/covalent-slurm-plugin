@@ -12,6 +12,12 @@ docker pull turuncu/slurm
 
 Also make sure your current directory is `tests/docker_tests` for all the commands mentioned below.
 
+Since we will be building an Ubuntu image and you might be running on a MacOS machine, you should also export this environment variable (or put it in your `~/.bashrc` or `~/.zshrc` file) to set the default docker build platform to linux/amd64:
+
+```bash
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
 ## Building the image
 
 ### Generating a keypair
@@ -34,7 +40,7 @@ We do some additional setup to the image so that the executor is able to ssh int
 docker build -t slurm-image .
 ```
 
-This will build the image and tag it as `slurm-image`.
+This will build the image and tag it as `slurm-image`. This usually takes about a minute or two since it also installs covalent and sets the right permissions for all the files.
 
 ## Running the container
 
@@ -44,11 +50,11 @@ To run the container, run:
 docker run -d -p 22:22 --name slurm-container slurm-image
 ```
 
-This will run the container in the background with name `slurm-container` and map port 22 of the container to port 22 of the host machine. This will allow us to ssh into the container.
+This will run the container in the background with name `slurm-container` and map port 22 of the container to port 22 of the host machine. This will allow us to ssh into the container. It takes about 10 to 20 seconds to start it up, only after which we can ssh into it.
 
 ### Changing the permissions of the slurm config
 
-We need to change the permissions of the slurm config file so that `slurmuser` can read it. To do this run:
+We need to change the permissions of the slurm config file so that `slurmuser` can read it. This cannot be done in the Dockerfile itself because the slurm files are created only once the container starts running - this is how the parent image works. To do this run:
 
 ```bash
 docker exec slurm-container chmod +r /etc/slurm/slurm.conf
@@ -79,5 +85,7 @@ from covalent_slurm_plugin import SlurmExecutor
 
 slurm_executor = SlurmExecutor(username="slurmuser", address="localhost", ssh_key_file="./slurm_test", conda_env="covalent", ignore_versions=True)
 ```
+
+This is assuming you are running this from inside the `tests/docker_tests` directory. If you are running this from somewhere else, make sure you change the `ssh_key_file` path to the correct path.
 
 You can mark `ignore_versions` as `False` (which is the default) if you want to make sure the same versions of python, covalent, and cloudpickle are used in the slurm job as on your local machine.
