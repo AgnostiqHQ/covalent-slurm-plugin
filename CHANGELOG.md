@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Excluding tests from the built package.
+- Removed python version pin for pre-commit hooks.
 
 ## [0.17.0] - 2024-01-19
 
