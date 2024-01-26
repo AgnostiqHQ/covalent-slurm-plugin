@@ -31,7 +31,7 @@ plugins_list = ["slurm = covalent_slurm_plugin.slurm"]
 
 setup_info = {
     "name": "covalent-slurm-plugin",
-    "packages": find_packages("."),
+    "packages": find_packages(exclude=["tests", "tests.*"]),
     "version": version,
     "maintainer": "Agnostiq",
     "url": "https://github.com/AgnostiqHQ/covalent-slurm-plugin",

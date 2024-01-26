@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+#SBATCH --job-name=test
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+##SBATCH --mem=1G
+##SBATCH --partition=debug
+#SBATCH --time=00:10:00
+#SBATCH --output=%x_%j.out
+#SBATCH --error=%x_%j.err
+
+echo "Hello World"
+echo "$(which python)" 1>&2

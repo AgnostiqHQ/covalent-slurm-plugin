@@ -29,13 +29,16 @@ SLURM_JOB_SCRIPT_TEMPLATE = """\
 
 if [ $? -ne 0 ] ; then
   >&2 echo "Failed to activate conda env '$__env_name' on compute node."
+  >&2 echo "In case you have the conda env installed, please make sure your .bashrc file doesn't ignore non-interactive shells."
   exit 99
 fi
 
 remote_py_version=$(python -c "print('.'.join(map(str, __import__('sys').version_info[:2])))")
-if [[ $remote_py_version != "{python_version}" ]] ; then
+if [[ $remote_py_version != "{python_version}" && {ignore_versions} != 1 ]] ; then
   >&2 echo "Python version mismatch."
   >&2 echo "Environment '$__env_name' (python=$remote_py_version) does not match task (python={python_version})."
+  >&2 echo "The task might still be runnable but if failed the error might not be as informative."
+  >&2 echo "You can do that by passing 'ignore_versions=True' in the SlurmExecutor constructor."
   exit 199
 fi
 
@@ -44,9 +47,11 @@ if [ $? -ne 0 ] ; then
   >&2 echo "Covalent may not be installed in the compute environment."
   >&2 echo "Please install covalent=={covalent_version} in the '$__env_name' conda env."
   exit 299
-elif [[ $covalent_version != "{covalent_version}" ]] ; then
+elif [[ $covalent_version != "{covalent_version}" && {ignore_versions} != 1 ]] ; then
   >&2 echo "Covalent version mismatch."
   >&2 echo "Environment '$__env_name' (covalent==$covalent_version) does not match task (covalent=={covalent_version})."
+  >&2 echo "The task might still be runnable but if failed the error might not be as informative."
+  >&2 echo "You can do that by passing 'ignore_versions=True' in the SlurmExecutor constructor."
   exit 299
 fi
 
@@ -55,9 +60,11 @@ if [ $? -ne 0 ] ; then
   >&2 echo "Cloudpickle may not be installed in the compute environment."
   >&2 echo "Please install cloudpickle=={cloudpickle_version} in the '$__env_name' conda env."
   exit 399
-elif [[ $cloudpickle_version != "{cloudpickle_version}" ]] ; then
+elif [[ $cloudpickle_version != "{cloudpickle_version}" && {ignore_versions} != 1 ]] ; then
   >&2 echo "Cloudpickle version mismatch."
   >&2 echo "Environment '$__env_name' (cloudpickle==$cloudpickle_version) does not match task (cloudpickle=={cloudpickle_version})."
+  >&2 echo "The task might still be runnable but if failed the error might not be as informative."
+  >&2 echo "You can do that by passing 'ignore_versions=True' in the SlurmExecutor constructor."
   exit 399
 fi
 
@@ -81,6 +88,7 @@ class JobScript:
         srun_append: Optional[str] = "",
         postrun_commands: Optional[List[str]] = None,
         use_srun: bool = True,
+        ignore_versions: bool = False,
     ):
         """Create a job script formatter.
 
@@ -97,6 +105,9 @@ class JobScript:
         self._srun_append = srun_append
         self._postrun_commands = postrun_commands or []
         self._use_srun = use_srun
+
+        # Convert it to an int for easier comparison in bash
+        self._ignore_versions = int(ignore_versions)
 
     @property
     def sbatch_directives(self) -> str:
@@ -116,9 +127,7 @@ class JobScript:
         setup_lines = [
             f"source {self._bashrc_path}" if self._bashrc_path else "",
         ]
-        for key, value in self._variables.items():
-            setup_lines.append(f'export {key}="{value}"')
-
+        setup_lines.extend(f'export {key}="{value}"' for key, value in self._variables.items())
         return "\n".join(setup_lines)
 
     @property
@@ -214,6 +223,7 @@ class JobScript:
             "sbatch_directives": self.sbatch_directives,
             "shell_env_setup": self.shell_env_setup,
             "conda_env_setup": self.conda_env_setup,
+            "ignore_versions": self._ignore_versions,
             "covalent_version": self.covalent_version,
             "cloudpickle_version": self.cloudpickle_version,
             "python_version": python_version,

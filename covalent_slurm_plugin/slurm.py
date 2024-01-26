@@ -64,6 +64,7 @@ class ExecutorPluginDefaults(BaseModel):
     cache_dir: Optional[str] = str(
         Path.home() / ".config/covalent/executor_plugins/covalent-slurm-cache"
     )
+    ignore_versions: bool = False
 
 
 _EXECUTOR_PLUGIN_DEFAULTS = ExecutorPluginDefaults().model_dump()
@@ -110,6 +111,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         log_stderr: The path to the file to be used for redirecting stderr.
         time_limit: time limit for the task
         retries: Number of times to retry execution upon failure
+        ignore_versions: Whether to ignore the Python, Covalent, and Cloudpickle version mismatch on the remote machine and try running the task anyway. Default is False.
     """
 
     def __init__(
@@ -138,6 +140,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         log_stderr: str = "",
         time_limit: int = -1,
         retries: int = 0,
+        ignore_versions: bool = None,
     ):
         super().__init__(
             log_stdout=log_stdout, log_stderr=log_stderr, time_limit=time_limit, retries=retries
@@ -156,6 +159,17 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.slurm_path = slurm_path or get_config("executors.slurm.slurm_path")
         self.poll_freq = poll_freq or get_config("executors.slurm.poll_freq")
         self.cache_dir = Path(cache_dir or get_config("executors.slurm.cache_dir"))
+        self.ignore_versions = (
+            ignore_versions
+            if ignore_versions is not None
+            else get_config("executors.slurm.ignore_versions")
+        )
+
+        # Resolve ssh_key_file and cert_file to absolute paths.
+        if self.ssh_key_file:
+            self.ssh_key_file = str(Path(self.ssh_key_file).expanduser().resolve())
+        if self.cert_file:
+            self.cert_file = str(Path(self.cert_file).expanduser().resolve())
 
         # Allow user to override bashrc_path with empty string.
         self.bashrc_path = (
@@ -301,6 +315,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             srun_append=self.srun_append,
             postrun_commands=self.postrun_commands,
             use_srun=self.use_srun,
+            ignore_versions=self.ignore_versions,
         )
 
         return job_script.format(
