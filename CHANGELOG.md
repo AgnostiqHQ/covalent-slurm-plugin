@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.18.0] - 2024-01-26
+
 ### Added
 
 - `ssh_key_file` and `cert_file` paths will now be expanded and resolved to their absolute paths instead of requiring to be absolute in the first place.
