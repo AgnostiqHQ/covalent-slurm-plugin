@@ -94,7 +94,7 @@ jobs:
         shell: python
 
       - name: Run tests
-        run: PYTHONPATH=$PWD/tests pytest -vv tests/ --cov=covalent_slurm_plugin
+        run: PYTHONPATH=$PWD/tests pytest -vv tests/ --cov=covalent_slurm_plugin --ignore=tests/docker_tests
 
       - name: Generate coverage report
         run: coverage xml -o coverage.xml
