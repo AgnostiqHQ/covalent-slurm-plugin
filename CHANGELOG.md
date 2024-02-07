@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Operations
+
+- Added a docker based SLURM cluster in the CI pipeline for testing the plugin.
+
 ## [0.18.0] - 2024-01-26
 
 ### Added
