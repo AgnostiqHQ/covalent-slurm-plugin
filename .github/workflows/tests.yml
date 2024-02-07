@@ -136,9 +136,14 @@ jobs:
           fi
           echo "RELEASE=$release" >> $GITHUB_ENV
           echo "::set-output name=release::$release"
+  
+  docker_test:
+    needs: tests
+    if: github.ref == 'refs/heads/develop' && needs.tests.outputs.release == 'true'
+    uses: ./.github/workflows/docker_test.yml
          
   release:
-    needs: tests
+    needs: docker_test
     if: github.ref == 'refs/heads/develop' && needs.tests.outputs.release == 'true'
     uses: AgnostiqHQ/covalent-slurm-plugin/.github/workflows/release.yml@develop
     secrets: inherit
