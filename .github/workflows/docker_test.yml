@@ -58,5 +58,6 @@ jobs:
           covalent start
           cd tests/docker_tests
           python basic_test.py
+          covalent logs
           covalent stop
 

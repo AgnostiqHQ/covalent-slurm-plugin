@@ -41,5 +41,7 @@ print(did)
 res = ct.get_result(did, wait=True)
 print(res)
 
+print("Node 0 error:", res._get_node_error(0))
+
 if __name__ == "__main__":
     assert res.result == 42
