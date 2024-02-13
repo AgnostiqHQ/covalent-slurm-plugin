@@ -25,6 +25,7 @@ slurm_executor = SlurmExecutor(
     ssh_key_file="./slurm_test",
     conda_env="covalent",
     ignore_versions=True,
+    ssh_port=2222,
 )
 
 
@@ -40,6 +41,8 @@ print(did)
 
 res = ct.get_result(did, wait=True)
 print(res)
+
+print("Node 0 error:", res._get_node_error(0))
 
 if __name__ == "__main__":
     assert res.result == 42
