@@ -22,7 +22,6 @@ on:
 
 jobs:
   build_container:
-    runs-on: ubuntu-latest
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
