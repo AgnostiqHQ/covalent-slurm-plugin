@@ -54,6 +54,9 @@ jobs:
           docker exec slurm-container chown slurmuser:slurmgroup /etc/slurm/slurm.conf
           docker exec slurm-container chmod +r /etc/slurm/slurm.conf
           docker exec slurm-container ls -l /etc/slurm/slurm.conf
+          docker exec slurm-container less /etc/passwd
+          docker exec slurm-container chmod 777 /etc/slurm/slurm.conf
+          docker exec slurm-container ls -l /etc/slurm/slurm.conf
       
       - name: Run a basic covalent test
         run: |
