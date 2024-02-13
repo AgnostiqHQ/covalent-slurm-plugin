@@ -50,6 +50,7 @@ jobs:
       
       - name: Run a basic covalent test
         run: |
+          pip install -e .
           cd tests/docker_tests
           python basic_test.py
 
