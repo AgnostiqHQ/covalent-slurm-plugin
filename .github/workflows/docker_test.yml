@@ -22,19 +22,15 @@ on:
 
 jobs:
   build_container:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["ubuntu-latest"]
-        container:
-          - python:3.8-bullseye
-          - python:3.9-bullseye
-          - python:3.10-bullseye
-    container: ${{ matrix.container }}
+    runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
       
       - name: Create the ssh keypair
         run: |
