@@ -49,7 +49,7 @@ jobs:
 
       - name: Start the SLURM cluster container
         run: |
-          docker run -d --name slurm-container slurm_test:latest
+          docker run -d -p 22:2222 --name slurm-container slurm_test:latest
           docker exec slurm-container chmod +r /etc/slurm/slurm.conf
       
       - name: Run a basic covalent test

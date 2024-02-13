@@ -25,6 +25,7 @@ slurm_executor = SlurmExecutor(
     ssh_key_file="./slurm_test",
     conda_env="covalent",
     ignore_versions=True,
+    ssh_port=2222,
 )
 
 

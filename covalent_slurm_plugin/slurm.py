@@ -65,6 +65,7 @@ class ExecutorPluginDefaults(BaseModel):
         Path.home() / ".config/covalent/executor_plugins/covalent-slurm-cache"
     )
     ignore_versions: bool = False
+    ssh_port: Optional[int] = 22
 
 
 _EXECUTOR_PLUGIN_DEFAULTS = ExecutorPluginDefaults().model_dump()
@@ -112,6 +113,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         time_limit: time limit for the task
         retries: Number of times to retry execution upon failure
         ignore_versions: Whether to ignore the Python, Covalent, and Cloudpickle version mismatch on the remote machine and try running the task anyway. Default is False.
+        ssh_port: Port number to use for SSH connection. Default is 22.
     """
 
     def __init__(
@@ -141,6 +143,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         time_limit: int = -1,
         retries: int = 0,
         ignore_versions: bool = None,
+        ssh_port: int = 22,
     ):
         super().__init__(
             log_stdout=log_stdout, log_stderr=log_stderr, time_limit=time_limit, retries=retries
@@ -164,6 +167,7 @@ class SlurmExecutor(AsyncBaseExecutor):
             if ignore_versions is not None
             else get_config("executors.slurm.ignore_versions")
         )
+        self.ssh_port = ssh_port or get_config("executors.slurm.ssh_port")
 
         # Resolve ssh_key_file and cert_file to absolute paths.
         if self.ssh_key_file:
@@ -235,6 +239,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         try:
             conn = await asyncssh.connect(
                 self.address,
+                self.ssh_port,
                 username=self.username,
                 client_keys=client_keys,
                 known_hosts=None,
