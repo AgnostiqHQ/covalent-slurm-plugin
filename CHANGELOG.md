@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `ssh_port` options in the slurmExecutor to allow connection to HPC system that use alternative port for `ssh`. 
+- `ssh_port` options in the slurmExecutor to allow connection to HPC system that use alternative port for `ssh`.
 
 ## [0.18.0] - 2024-01-26
 
