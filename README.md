@@ -26,6 +26,17 @@ pip install covalent-slurm-plugin
 
 On the remote system, the Python version in the environment you plan to use must match that used when dispatching the calculations. Additionally, the remote system's Python environment must have the base [covalent package](https://github.com/AgnostiqHQ/covalent) installed (e.g. `pip install covalent`).
 
+
+For development use the following to build it.
+
+- Create a python environment, and in that environment install `pip install build`
+- Go to the source folder, and run
+
+```bash
+python -m build
+```
+
+
 ## Usage
 
 The following shows an example of a Covalent [configuration](https://covalent.readthedocs.io/en/latest/how_to/config/customization.html) that is modified to support Slurm:

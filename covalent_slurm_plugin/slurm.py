@@ -47,6 +47,7 @@ class ExecutorPluginDefaults(BaseModel):
     address: Optional[str] = ""
     ssh_key_file: Optional[str] = ""
     cert_file: Optional[str] = None
+    ssh_port: Optional[int] = 22
     remote_workdir: Optional[str] = "covalent-workdir"
     create_unique_workdir: bool = False
     variables: Optional[Dict[str, str]] = Field(default_factory=dict)
@@ -120,6 +121,8 @@ class SlurmExecutor(AsyncBaseExecutor):
         address: Optional[str] = None,
         ssh_key_file: Optional[str] = None,
         cert_file: Optional[str] = None,
+        # added ssh port option: Rajarshi
+        ssh_port: Optional[int] = 22,
         remote_workdir: Optional[str] = None,
         create_unique_workdir: bool = False,
         options: Optional[Dict] = None,
@@ -150,6 +153,8 @@ class SlurmExecutor(AsyncBaseExecutor):
         self.address = address or get_config("executors.slurm.address")
         self.ssh_key_file = ssh_key_file or get_config("executors.slurm.ssh_key_file")
         self.cert_file = cert_file or get_config("executors.slurm").get("cert_file", None)
+        # add ssh port: Rajarshi
+        self.ssh_port = ssh_port or get_config("executors.slurm").get("ssh_port", 22)
         self.remote_workdir = remote_workdir or get_config("executors.slurm.remote_workdir")
         self.variables = variables or get_config("executors.slurm.variables")
         self.conda_env = conda_env or get_config("executors.slurm.conda_env")
@@ -235,6 +240,7 @@ class SlurmExecutor(AsyncBaseExecutor):
         try:
             conn = await asyncssh.connect(
                 self.address,
+                port=self.ssh_port,
                 username=self.username,
                 client_keys=client_keys,
                 known_hosts=None,
